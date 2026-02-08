@@ -261,18 +261,6 @@
     /* -------------------- Constants & helpers -------------------- */
     const LETTER_TO_INDEX = { 'C':0,'D':2,'E':4,'F':5,'G':7,'A':9,'B':11 };
 
-    const SAFE_TONICS_MAJOR = {
-      0: ['C'], 1: ['Db','C#'], 2: ['D'], 3: ['Eb'], 4: ['E','Fb'],
-      5: ['F'], 6: ['F#','Gb'], 7: ['G'], 8: ['Ab'], 9: ['A'],
-      10:['Bb'], 11:['B','Cb']
-    };
-
-    // map canonical tonic name -> #accidentals (preferring single-name entries)
-    const ACCIDENTAL_COUNT = {
-      'C':0,'G':1,'D':2,'A':3,'E':4,'B':5,'F#':6,'C#':7,
-      'F':1,'Bb':2,'Eb':3,'Ab':4,'Db':5,'Gb':6,'Cb':7
-    };
-
     function tonicNameNormalized(name) {
       if (!name) return null;
       return String(name).replace(/♯/g,'#').replace(/♭/g,'b').replace(/-/g,'b').trim();
@@ -289,7 +277,6 @@
         const c = candidates.find(x => x.includes('b'));
         if (c) return c;
       }
-      // fall back to a canonical name if available in ACCIDENTAL_COUNT
       for (const c of candidates) {
         if (c in ACCIDENTAL_COUNT) return c;
       }
@@ -305,8 +292,6 @@
     }
 
     /* -------------------- enharmonic display toggle -------------------- */
-    // displayTonicOverride stores a specific name (like 'C#' or 'Db') to display.
-    // enharmonicCycleList stores the available names for the current displayed index.
     let displayTonicOverride = null;
     let enharmonicCycleList = null;
     function toggleEnharmonicDisplay() {
@@ -423,7 +408,7 @@
     let figuresAbove = false;
     let conventionsMode = 'historic';
     let currentSemitones = 0; // -6..+6 preferred
-    let octaveShift = 0;      // integer, each = ±12 semitones displayed with prefix +/-
+    let octaveShift = 0;      // integer, each = ±12 semitones displayed with prefix +/- 
     let currentScale = baseOptions.scale;
     let currentSpacingLinear = baseOptions.spacingLinear;
     let originalKeyIndex = null;
@@ -1057,34 +1042,66 @@
     setMaxDifficulty(7);
 
     /* -------------------- Candidate selection logic (7#/7b handled) -------------------- */
+
+    const SAFE_TONICS_MAJOR = {
+      0:  ['C'],
+      1:  ['C#','Db'],
+      2:  ['D'],
+      3:  ['D#','Eb'],
+      4:  ['E','Fb'],
+      5:  ['F'],
+      6:  ['F#','Gb'],
+      7:  ['G'],
+      8:  ['G#','Ab'],
+      9:  ['A'],
+      10: ['A#','Bb'],
+      11: ['B','Cb']
+    };
+
+    const ACCIDENTAL_COUNT = {
+      'C': 0, 'G': 1, 'D': 2, 'A': 3, 'E': 4, 'B': 5, 'F#': 6, 'C#': 7,
+      'F': 1, 'Bb': 2, 'Eb': 3, 'Ab': 4, 'Db': 5, 'Gb': 6, 'Cb': 7,
+      'A#': 7, 'G#': 6, 'D#': 3
+    };
+
+    // Strict: collect counts for index
     function countsForIndexCandidates(idx) {
       const cand = SAFE_TONICS_MAJOR[idx] || [];
       const counts = new Set();
       for (const name of cand) {
-        const normalized = tonicNameNormalized(name);
-        if (normalized in ACCIDENTAL_COUNT) counts.add(ACCIDENTAL_COUNT[normalized]);
+        const norm = tonicNameNormalized(name);
+        if (norm in ACCIDENTAL_COUNT) counts.add(ACCIDENTAL_COUNT[norm]);
       }
       return Array.from(counts);
     }
 
-    function pickDisplayNameForIndexByAccCount(idx, allowedCounts, preferSharpsIfBoth=false) {
-      // prefer a name for idx whose ACCIDENTAL_COUNT is in allowedCounts
+    /**
+     * Pick a display name for the given index.
+     * - preferredCounts is a Set of accidental counts the user has selected (e.g. {7})
+     * - If any spellings match preferredCounts, pick randomly among those.
+     * - Otherwise, pick randomly among spellings whose accidental-count <= 7.
+     * - If none of the spellings have a known accidental-count, fall back to a canonical name.
+     */
+    function pickDisplayNameForIndexByAccCount(idx, preferredCounts /* Set */) {
       const names = SAFE_TONICS_MAJOR[idx] || [];
-      // normalize
-      const candidates = names.map(n => ({ raw: n, norm: tonicNameNormalized(n), count: ACCIDENTAL_COUNT[tonicNameNormalized(n)] || null }));
-      // filter to allowed
-      const allowed = candidates.filter(c => c.count !== null && allowedCounts.has(c.count));
-      if (allowed.length) {
-        // if both sharp & flat are available and preferSharpsIfBoth choose sharp
-        if (preferSharpsIfBoth) {
-          const sharp = allowed.find(a => a.raw.includes('#'));
-          if (sharp) return sharp.raw;
-        }
-        return allowed[0].raw;
-      }
-      // otherwise return canonical via ACCIDENTAL_COUNT fallback or first
-      const canon = candidates.find(c => c.norm in ACCIDENTAL_COUNT);
-      return (canon ? canon.raw : (names[0] || indexToTonic(idx, '')));
+      // collect spellings with known counts
+      const withCount = names.map(n => {
+        const norm = tonicNameNormalized(n);
+        const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+        return { raw: n, norm, cnt };
+      });
+
+      // 1) prefer spellings that match the user's selected buckets
+      const preferred = withCount.filter(x => x.cnt !== null && preferredCounts.has(x.cnt)).map(x => x.raw);
+      if (preferred.length) return preferred[Math.floor(Math.random() * preferred.length)];
+
+      // 2) otherwise use any spelling that is not "theoretical" (>7 accidentals)
+      const nonTheoretical = withCount.filter(x => x.cnt !== null && x.cnt <= 7).map(x => x.raw);
+      if (nonTheoretical.length) return nonTheoretical[Math.floor(Math.random() * nonTheoretical.length)];
+
+      // 3) fallback: return any name (maybe unknown) or indexToTonic
+      if (names.length) return names[Math.floor(Math.random() * names.length)];
+      return indexToTonic(idx, '');
     }
 
     async function pickRandomTuneAndTranspose() {
@@ -1102,14 +1119,14 @@
           if (!fr || !fr.ok) continue;
           const text = await fr.text();
           const meta = extractSecondSpineMeta(text || '');
-const dir = (meta.dir || '').toLowerCase();
+          const dir = (meta.dir || '').toLowerCase();
 
-// treat values like "Descending Minor" or "Ascending (etc.)" as descending/ascending
-const isAsc = /\bascend/.test(dir);
-const isDesc = /\bdescend/.test(dir);
+          // Treat values like "Descending Minor" or "Ascending (etc.)" as descending/ascending
+          const isAsc = /\bascend/.test(dir);
+          const isDesc = /\bdescend/.test(dir);
 
-if (!filterAscending && isAsc) continue;
-if (!filterDescending && isDesc) continue;
+          if (!filterAscending && isAsc) continue;
+          if (!filterDescending && isDesc) continue;
 
           const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
           if (!isNaN(num) && num > maxDifficulty) continue;
@@ -1131,13 +1148,23 @@ if (!filterDescending && isDesc) continue;
       const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
 
       // Determine allowed target indices based on selected accidental-count buckets and mode
-      const accidentalSet = new Set(Array.from(accidentalsSelected));
+      const accidentalSet = new Set(Array.from(accidentalsSelected)); // e.g. {7}
       const excluded = getExcludedTonicsSet();
       const possibleTargets = [];
 
       for (let idx = 0; idx < 12; idx++) {
+        const names = SAFE_TONICS_MAJOR[idx] || [];
+
+        // compute counts for this index for both available spellings
+        const nameInfos = names.map(n => {
+          const norm = tonicNameNormalized(n);
+          const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+          return { raw: n, norm, cnt };
+        });
+
+        // if source is major we compare to major counts, else to relative-major-of-minor counts (keep previous logic)
         const countsMajor = countsForIndexCandidates(idx);
-        const countsMinor = countsForIndexCandidates((idx + 3) % 12); // relative major for minor
+        const countsMinor = countsForIndexCandidates((idx + 3) % 12);
 
         if (sourcePick.original.isMajor) {
           const anyMatch = countsMajor.some(c => accidentalSet.has(c));
@@ -1147,18 +1174,38 @@ if (!filterDescending && isDesc) continue;
           if (!anyMatch) continue;
         }
 
-        const names = SAFE_TONICS_MAJOR[idx] || [];
-        const anyExcluded = names.some(n => excluded.has(tonicNameNormalized(n)));
+        // exclude indices where every spelling is excluded by the 'Exclude' list
+        const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
         if (anyExcluded) continue;
+
+        // Now ensure this index actually has at least one spelling that:
+        //  - has a known accidental-count
+        //  - its accidental-count <= 7 (no theoretical >7)
+        //  - and (preferably) matches one of the selected accidental buckets
+        const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
+        if (!validSpellings.length) continue; // all theoretical >7
+
+        if (accidentalSet.size > 0) {
+          const matchesBucket = validSpellings.some(n => accidentalSet.has(n.cnt));
+          if (!matchesBucket) continue; // index doesn't provide any spelling in the selected bucket
+        }
 
         possibleTargets.push({ idx, names });
       }
 
+      // Fallback: if still empty, allow indices with any non-theoretical spelling (<=7) ignoring the bucket-match
       if (!possibleTargets.length) {
         for (let idx = 0; idx < 12; idx++) {
           const names = SAFE_TONICS_MAJOR[idx] || [];
-          const anyExcluded = names.some(n => excluded.has(tonicNameNormalized(n)));
+          const nameInfos = names.map(n => {
+            const norm = tonicNameNormalized(n);
+            const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+            return { raw: n, norm, cnt };
+          });
+          const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
           if (anyExcluded) continue;
+          const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
+          if (!validSpellings.length) continue;
           possibleTargets.push({ idx, names });
         }
       }
@@ -1172,8 +1219,8 @@ if (!filterDescending && isDesc) continue;
       let sem = semitonesRaw;
       if (sem > 6) sem = sem - 12;
 
-      const displayName = pickDisplayNameForIndexByAccCount(chosen.idx, accidentalSet, /*preferSharpsIfBoth=*/true);
-
+      // choose display name from spellings that match the selected buckets if possible
+      const displayName = pickDisplayNameForIndexByAccCount(chosen.idx, accidentalSet);
       return { filename: sourcePick.filename, text: sourcePick.text, semitones: sem, displayName: displayName, enharmList: SAFE_TONICS_MAJOR[chosen.idx] || [], meta: sourcePick.meta };
     }
 
