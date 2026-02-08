@@ -1,6 +1,6 @@
 **kern	**fb	**text	**text
 !!		actual acc.	force diatonic accidental
-!! Dir	Descending Minor
+!! Dir	Ascending Minor
 !! Title	Rule of the Octave
 !! Number	3
 *clefF4	*	*	*
@@ -20,5 +20,6 @@
 4G#	5-	5n	.
 4A	.	.	.
 =|	=|	=|	=|
+
 
 *-	*-	*-	*-
