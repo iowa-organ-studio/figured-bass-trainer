@@ -1,0 +1,19 @@
+**kern	**fb	**text	**text
+!!		actual acc.	force diatonic accidental
+!! Dir	Descending
+!! Title	Rule of the Octave
+!! Number	1
+*clefF4	*	*	*
+*k[]	*k[]	*k[]	*k[]
+*a:	*a:	*a:	*a:
+=1	=1	=1	=1
+4A	.	.	.
+4G	6	.	.
+4F	6	.	.
+4E	#	#	.
+4D	4#|	4#	.
+4C	6	.	.
+4BB	6/	6#	.
+4AA	.	.	.
+=|	=|	=|	=|
+*-	*-	*-	*-
