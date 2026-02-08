@@ -166,7 +166,7 @@
             <span id="spacingBadge" class="badge">—</span>
           </div>
         </div>
-        <!-- max spacing increased to 0.50 -->
+        <!-- max spacing increased to 0.50; default 0.32 -->
         <input id="spacingSlider" type="range" min="0.20" max="0.50" step="0.01" value="0.32" />
       </div>
     </div>
@@ -267,6 +267,7 @@
       10:['Bb'], 11:['B','Cb']
     };
 
+    // map canonical tonic name -> #accidentals (preferring single-name entries)
     const ACCIDENTAL_COUNT = {
       'C':0,'G':1,'D':2,'A':3,'E':4,'B':5,'F#':6,'C#':7,
       'F':1,'Bb':2,'Eb':3,'Ab':4,'Db':5,'Gb':6,'Cb':7
@@ -288,6 +289,7 @@
         const c = candidates.find(x => x.includes('b'));
         if (c) return c;
       }
+      // fall back to a canonical name if available in ACCIDENTAL_COUNT
       for (const c of candidates) {
         if (c in ACCIDENTAL_COUNT) return c;
       }
@@ -303,22 +305,21 @@
     }
 
     /* -------------------- enharmonic display toggle -------------------- */
-    // This is display-only: cycles through possible enharmonic names for the CURRENT display tonic.
+    // displayTonicOverride stores a specific name (like 'C#' or 'Db') to display.
+    // enharmonicCycleList stores the available names for the current displayed index.
     let displayTonicOverride = null;
+    let enharmonicCycleList = null;
     function toggleEnharmonicDisplay() {
-      // compute the current display index
-      if (originalKeyIndex === null) return;
-      const displayIndex = (originalKeyIndex + currentSemitones + 120) % 12;
-      const names = SAFE_TONICS_MAJOR[displayIndex] || [indexToTonic(displayIndex, '')];
-      if (!names.length) return;
-      // If override not set, choose next name that's different than current name
-      const currentName = displayTonicOverride || indexToTonic(displayIndex, originalAccidentalPref || '');
-      // find index of currentName in names (match normalized)
-      let i = names.findIndex(n => tonicNameNormalized(n) === tonicNameNormalized(currentName));
+      if (!enharmonicCycleList || enharmonicCycleList.length <= 1) {
+        displayTonicOverride = enharmonicCycleList ? enharmonicCycleList[0] : displayTonicOverride;
+        renderWithTranspose();
+        return;
+      }
+      const cur = displayTonicOverride || enharmonicCycleList[0];
+      let i = enharmonicCycleList.findIndex(n => tonicNameNormalized(n) === tonicNameNormalized(cur));
       if (i === -1) i = 0;
-      const next = names[(i+1) % names.length];
-      // if only one name, toggling will just keep the same; that's fine
-      displayTonicOverride = tonicNameNormalized(next) === tonicNameNormalized(currentName) ? null : next;
+      const next = enharmonicCycleList[(i+1) % enharmonicCycleList.length];
+      displayTonicOverride = next;
       renderWithTranspose();
     }
 
@@ -421,7 +422,8 @@
     /* -------------------- state -------------------- */
     let figuresAbove = false;
     let conventionsMode = 'historic';
-    let currentSemitones = 0;
+    let currentSemitones = 0; // -6..+6 preferred
+    let octaveShift = 0;      // integer, each = ±12 semitones displayed with prefix +/-
     let currentScale = baseOptions.scale;
     let currentSpacingLinear = baseOptions.spacingLinear;
     let originalKeyIndex = null;
@@ -435,7 +437,7 @@
     let filterMajor = true;
     let filterMinor = true;
 
-    /* -------------------- figures helpers -------------------- */
+    /* -------------------- figures helpers & parsing -------------------- */
     function normalizeAccRaw(acc) {
       if (!acc) return '';
       acc = acc.replace(/\s+/g, '');
@@ -518,12 +520,12 @@
     }
 
     /* -------------------- prepareFiguredBassForTranspose -------------------- */
-    // (kept — same as last working implementation)
     function prepareFiguredBassForTranspose(humText, semitones) {
       if (!humText) return '';
 
       const lines = humText.split(/\r?\n/);
 
+      // --------- discover spines (kern, fb, 3rd=actual, 4th=force-diatonic) ----------
       let headerBlockEnd = -1;
       let kernIndices = [];
       let fbIndex = null;
@@ -538,10 +540,12 @@
         if (toks.some(t => String(t).startsWith('**'))) {
           headerBlockEnd = i;
 
+          // first/any **kern indices (we'll use the 1st as bass reference)
           for (let c = 0; c < toks.length; c++) {
             if (String(toks[c]).startsWith('**kern')) kernIndices.push(c);
           }
 
+          // first **fb-like index
           for (let c = 0; c < toks.length; c++) {
             const t = String(toks[c]);
             if (t.startsWith('**fb') || t.startsWith('**fba') || t.startsWith('**fbb')) {
@@ -549,6 +553,7 @@
             }
           }
 
+          // 3rd and 4th spines: first and second **text after **fb
           if (fbIndex !== null) {
             let foundFirst = false;
             for (let c = fbIndex + 1; c < toks.length; c++) {
@@ -569,6 +574,7 @@
       const preHeaderLines = lines.slice(0, headerBlockEnd + 1);
       const restLines      = lines.slice(headerBlockEnd + 1);
 
+      // --------- global max numerals for alignment (from original fb column) ----------
       let globalMax = 0;
       for (const line of restLines) {
         if (!line) continue;
@@ -585,6 +591,7 @@
         globalMax = Math.max(globalMax, numeralsCount);
       }
 
+      // --------- target key map (major / natural minor) ----------
       const scalePCByLetter = findScaleMapFor(semitones);
       const scaleLettersByPc = scalePCByLetter
         ? Object.keys(scalePCByLetter).reduce((acc, L) => {
@@ -595,6 +602,8 @@
           }, {})
         : null;
 
+      // ===== Helpers (5a–5c logic) =====
+
       function pcNewBass(bassInfo) {
         return (bassInfo.pc + semitones + 120) % 12;
       }
@@ -602,6 +611,7 @@
       function targetLetterForDegree(newBassPc, degree) {
         if (!scalePCByLetter || !scaleLettersByPc) return null;
 
+        // unique diatonic bass-letter in target key (by key signature)
         let bassLetterInTargetKey = null;
         for (const L of Object.keys(scalePCByLetter)) {
           if (scalePCByLetter[L] === newBassPc) { bassLetterInTargetKey = L; break; }
@@ -613,6 +623,7 @@
         return LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
       }
 
+      // PRINT ACCIDENTAL RELATIVE TO THE NATURAL LETTER (Step 6)
       function accidentalForDirection(targetLetter, direction) {
         if (!targetLetter || !scalePCByLetter) return null;
         const diatonicPc = scalePCByLetter[targetLetter];
@@ -626,10 +637,12 @@
         else if (/n/i.test(direction)) desiredPc = naturalPc;
         else desiredPc = diatonicPc;
 
+        // NEW: relative to natural (so F## -> '##', Ab -> 'b', etc.)
         const finalAccSym = accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc);
-        return finalAccSym;
+        return finalAccSym; // '', 'n', '#', 'b', '##', 'bb', or null
       }
 
+      // 4th spine: courtesy accidental for the *diatonic* pitch itself (always explicit)
       function accidentalForDiatonic(targetLetter) {
         if (!targetLetter || !scalePCByLetter) return null;
         const diatonicPc = scalePCByLetter[targetLetter];
@@ -638,7 +651,7 @@
         if (diff === 0)  return 'n';
         if (diff === 1)  return '#';
         if (diff === 11) return 'b';
-        if (diff === 2) return '##';
+        if (diff === 2)  return '##';
         if (diff === 10) return 'bb';
         return null;
       }
@@ -654,7 +667,7 @@
         const mAccOnly = s.match(/^([#♯b♭nN\-\/\\]+)$/);
         if (mAccOnly) {
           const accRaw = normalizeAccRaw(mAccOnly[1] || '');
-          return { degree: 3, acc: accRaw, accOnly: true, raw: s };
+          return { degree: 3, acc: accRaw, accOnly: true, raw: s }; // D2
         }
         return null;
       }
@@ -672,15 +685,17 @@
         return (
           fullToken === '5-' ||
           fullToken === '4#|' ||
-          /[\\\/]$/.test(fullToken)
+          /[\\\/]$/.test(fullToken) // slashed endings
         );
       }
+
+      // ===== per-part processors =====
 
       function processFbPartHistorical(partRaw, kernTok) {
         if (!partRaw || /^[\*\=\!\|]/.test(partRaw) || partRaw === '.') return partRaw;
 
         const fullToken = String(partRaw);
-        if (isHistoricalPassThroughToken(fullToken)) return fullToken;
+        if (isHistoricalPassThroughToken(fullToken)) return fullToken;  // D1
 
         let trailingBar = '';
         let part = fullToken;
@@ -711,41 +726,45 @@
       }
 
       function processFbPartActual(partFromActualSpine, kernTok) {
-        if (!partFromActualSpine || /^[\*\=\!\|]/.test(partFromActualSpine) || partFromActualSpine === '.') return partFromActualSpine;
+  if (!partFromActualSpine || /^[\*\=\!\|]/.test(partFromActualSpine) || partFromActualSpine === '.') return partFromActualSpine;
 
-        let trailingBar = '';
-        let part = String(partFromActualSpine);
-        if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
+  let trailingBar = '';
+  let part = String(partFromActualSpine);
+  if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
 
-        const parsed = parseFigurePart(part);
-        if (!parsed) return partFromActualSpine;
+  const parsed = parseFigurePart(part);
+  if (!parsed) return partFromActualSpine;
 
-        if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
+  // Numeral with NO accidental: keep numeral unchanged (no chromatic info to carry)
+  if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
 
-        const bassInfo = parseKernPitch(kernTok);
-        if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
-          return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-        }
+  const bassInfo = parseKernPitch(kernTok);
+  if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
+    // No context – preserve literal (normalize to humdrum)
+    return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+  }
 
-        const newBassPc    = pcNewBass(bassInfo);
-        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree);
-        if (!targetLetter) {
-          return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-        }
+  const newBassPc    = pcNewBass(bassInfo);
+  const targetLetter = targetLetterForDegree(newBassPc, parsed.degree);
+  if (!targetLetter) {
+    return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+  }
 
-        let finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
-        if (finalAccSym === null) {
-          return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-        }
+  let finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
+  if (finalAccSym === null) {
+    return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+  }
 
-        if (finalAccSym === '' && /n/i.test(parsed.acc)) {
-          finalAccSym = 'n';
-        }
+  // --- IMPORTANT: preserve explicit natural from Actual (3rd spine) ---
+  // If source had 'n' but the computed symbol is empty (''), still print 'n'.
+  if (finalAccSym === '' && /n/i.test(parsed.acc)) {
+    finalAccSym = 'n';
+  }
 
-        return parsed.accOnly
-          ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
-          : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
-      }
+  return parsed.accOnly
+    ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
+    : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
+}
 
       function processForceDiatonicPart(partFromForceSpine, kernTok) {
         if (!partFromForceSpine || /^[\*\=\!\|]/.test(partFromForceSpine) || partFromForceSpine === '.') return partFromForceSpine;
@@ -759,7 +778,7 @@
 
         const bassInfo = parseKernPitch(kernTok);
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
-          return String(parsed.degree) + 'n' + trailingBar;
+          return String(parsed.degree) + 'n' + trailingBar; // safest courtesy
         }
         const newBassPc    = pcNewBass(bassInfo);
         const targetLetter = targetLetterForDegree(newBassPc, parsed.degree);
@@ -767,10 +786,12 @@
           return String(parsed.degree) + 'n' + trailingBar;
         }
 
-        const diatonicAcc = accidentalForDiatonic(targetLetter);
+        const diatonicAcc = accidentalForDiatonic(targetLetter); // '#','b','n','##','bb'
         const outAcc = diatonicAcc || 'n';
         return String(parsed.degree) + toHumdrumAcc(outAcc) + trailingBar;
       }
+
+      // ===== process body lines =====
 
       let lastKernTokForBass = null;
 
@@ -779,6 +800,7 @@
         const useTabs = line.indexOf('\t') !== -1;
         const toks = useTabs ? line.split('\t') : line.split(/\s+/);
 
+        // handle header-like lines inside body
         if (toks.some(t => String(t).startsWith('**'))) {
           return useTabs ? toks.join('\t') : toks.join(' ');
         }
@@ -791,6 +813,7 @@
         );
         while (toks.length <= maxIdxToEnsure) toks.push('.');
 
+        // carry-forward bass
         const kernTokRaw = (kernIndices && kernIndices.length) ? toks[kernIndices[0]] : null;
         const parsedBassNow = parseKernPitch(kernTokRaw);
         if (parsedBassNow && typeof parsedBassNow.pc === 'number') {
@@ -800,6 +823,7 @@
           ? kernTokRaw
           : lastKernTokForBass;
 
+        // pick sources with precedence: 4th (always) > 3rd (if Actual) > 2nd
         const fbTokSrc  = toks[fbIndex];
         const forceTok  = (forceTextIndex  != null) ? toks[forceTextIndex] : null;
         const actualTok = (conventionsMode === 'modern' && actualTextIndex != null) ? toks[actualTextIndex] : null;
@@ -828,9 +852,10 @@
             : processedParts.join(' ');
         }
 
+        // NEUTRALIZE helper spines on DATA rows only (preserve * / = / ! / |)
         function neutralizeHelperToken(tok) {
           if (!tok) return '.';
-          if (/^[\*\=\!|]/.test(tok)) return tok;
+          if (/^[\*\=\!|]/.test(tok)) return tok; // keep interpretations, barlines, comments, '|' separators
           return '.';
         }
         if (actualTextIndex != null) toks[actualTextIndex] = neutralizeHelperToken(toks[actualTextIndex]);
@@ -839,11 +864,13 @@
         return useTabs ? toks.join('\t') : toks.join(' ');
       });
 
+      // header rewrite (figures-above + neutralize helper spine headers)
       const processedHeader = preHeaderLines.map(hl => {
         if (!hl) return hl;
         const useTabs = hl.indexOf('\t') !== -1;
         const toks = useTabs ? hl.split('\t') : hl.split(/\s+/);
 
+        // Convert **fb -> **fba only if figuresAbove
         if (figuresAbove) {
           for (let c = 0; c < toks.length; c++) {
             if (String(toks[c]).startsWith('**fb') && !String(toks[c]).startsWith('**fba')) {
@@ -851,6 +878,7 @@
             }
           }
         }
+        // Neutralize **text headers for helper spines
         for (let c = 0; c < toks.length; c++) {
           if (actualTextIndex != null && c === actualTextIndex && String(toks[c]).startsWith('**text')) {
             toks[c] = '**text-hidden';
@@ -877,6 +905,7 @@
     function renderWithTranspose() {
       const humPanelEl = document.getElementById('humPanel');
 
+      // Always run the preparation pass so 4th spine can override even with 0 transpose
       const preparedHum = prepareFiguredBassForTranspose(humData || "", currentSemitones);
 
       const semText = String(currentSemitones || 0);
@@ -903,11 +932,18 @@
         const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
         const tonic = tonicDisplayWithGlyphs(tonicRaw);
         const modeText = originalIsMajor ? ' major' : ' minor';
-        options.transpose = (tonicRaw || "");
-        document.getElementById('statusKey').textContent = tonic + modeText;
+        const prefix = octaveShift > 0 ? "+".repeat(octaveShift) : octaveShift < 0 ? "-".repeat(-octaveShift) : "";
+        options.transpose = prefix + (tonicRaw || "");
+        if (octaveShift !== 0) {
+          const octaveText = octaveShift > 0 ? " 8va↑ (" + String(octaveShift) + ")" : " 8va↓ (" + String(octaveShift) + ")";
+          document.getElementById('statusKey').textContent = tonic + modeText + octaveText;
+        } else {
+          document.getElementById('statusKey').textContent = tonic + modeText;
+        }
       } else {
         options.transpose = "";
-        document.getElementById('statusKey').textContent = "original";
+        if (currentSemitones === 0 && octaveShift === 0) document.getElementById('statusKey').textContent = "original";
+        else document.getElementById('statusKey').textContent = "transposed " + String(currentSemitones) + " st";
       }
 
       vrvToolkit.setOptions(options);
@@ -929,8 +965,8 @@
     document.getElementById('enharmonicBtn').addEventListener('click', ()=>{ toggleEnharmonicDisplay(); });
 
     // Octave buttons: immediate +/-12 semitones
-    document.getElementById('octUpBtn').addEventListener('click', ()=>{ currentSemitones += 12; displayTonicOverride = null; renderWithTranspose(); });
-    document.getElementById('octDownBtn').addEventListener('click', ()=>{ currentSemitones -= 12; displayTonicOverride = null; renderWithTranspose(); });
+    document.getElementById('octUpBtn').addEventListener('click', ()=>{ octaveShift += 1; renderWithTranspose(); });
+    document.getElementById('octDownBtn').addEventListener('click', ()=>{ octaveShift -= 1; renderWithTranspose(); });
 
     document.getElementById('musicPlusBtn').addEventListener('click', () => { currentScale = clamp(currentScale + 2, 30, 200); renderWithTranspose(); });
     document.getElementById('musicMinusBtn').addEventListener('click', () => { currentScale = clamp(currentScale - 2, 30, 200); renderWithTranspose(); });
@@ -1025,9 +1061,30 @@
       const cand = SAFE_TONICS_MAJOR[idx] || [];
       const counts = new Set();
       for (const name of cand) {
-        if (name in ACCIDENTAL_COUNT) counts.add(ACCIDENTAL_COUNT[name]);
+        const normalized = tonicNameNormalized(name);
+        if (normalized in ACCIDENTAL_COUNT) counts.add(ACCIDENTAL_COUNT[normalized]);
       }
       return Array.from(counts);
+    }
+
+    function pickDisplayNameForIndexByAccCount(idx, allowedCounts, preferSharpsIfBoth=false) {
+      // prefer a name for idx whose ACCIDENTAL_COUNT is in allowedCounts
+      const names = SAFE_TONICS_MAJOR[idx] || [];
+      // normalize
+      const candidates = names.map(n => ({ raw: n, norm: tonicNameNormalized(n), count: ACCIDENTAL_COUNT[tonicNameNormalized(n)] || null }));
+      // filter to allowed
+      const allowed = candidates.filter(c => c.count !== null && allowedCounts.has(c.count));
+      if (allowed.length) {
+        // if both sharp & flat are available and preferSharpsIfBoth choose sharp
+        if (preferSharpsIfBoth) {
+          const sharp = allowed.find(a => a.raw.includes('#'));
+          if (sharp) return sharp.raw;
+        }
+        return allowed[0].raw;
+      }
+      // otherwise return canonical via ACCIDENTAL_COUNT fallback or first
+      const canon = candidates.find(c => c.norm in ACCIDENTAL_COUNT);
+      return (canon ? canon.raw : (names[0] || indexToTonic(idx, '')));
     }
 
     async function pickRandomTuneAndTranspose() {
@@ -1110,7 +1167,9 @@
       let sem = semitonesRaw;
       if (sem > 6) sem = sem - 12;
 
-      return { filename: sourcePick.filename, text: sourcePick.text, semitones: sem, meta: sourcePick.meta };
+      const displayName = pickDisplayNameForIndexByAccCount(chosen.idx, accidentalSet, /*preferSharpsIfBoth=*/true);
+
+      return { filename: sourcePick.filename, text: sourcePick.text, semitones: sem, displayName: displayName, enharmList: SAFE_TONICS_MAJOR[chosen.idx] || [], meta: sourcePick.meta };
     }
 
     /* -------------------- Random button wiring -------------------- */
@@ -1131,11 +1190,7 @@
           if (k) {
             originalKeyIndex = keyToIndex(k.letter, k.accidental);
             originalIsMajor = (k.letter === k.letter.toUpperCase());
-            originalAccidentalPref =
-              (k.accidental === '#' || k.accidental === '♯') ? '#'
-              : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b'
-              : '';
-            enharmonicPreference = ''; // not used for toggling anymore
+            originalAccidentalPref = (k.accidental === '#' || k.accidental === '♯') ? '#' : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b' : '';
           } else {
             originalKeyIndex = null;
             originalIsMajor = true;
@@ -1143,7 +1198,9 @@
           }
 
           currentSemitones = res.semitones;
-          displayTonicOverride = null; // reset the display toggle when new tune selected
+          octaveShift = 0;
+          displayTonicOverride = res.displayName || null;
+          enharmonicCycleList = (res.enharmList && res.enharmList.length) ? res.enharmList.slice() : (originalKeyIndex !== null ? SAFE_TONICS_MAJOR[(originalKeyIndex+currentSemitones+120)%12] : []);
         } else {
           const r = await loadRandomTuneToHumData();
           if (r) {
@@ -1158,13 +1215,12 @@
             if (k) {
               originalKeyIndex = keyToIndex(k.letter, k.accidental);
               originalIsMajor = (k.letter === k.letter.toUpperCase());
-              originalAccidentalPref =
-                (k.accidental === '#' || k.accidental === '♯') ? '#'
-                : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b'
-                : '';
+              originalAccidentalPref = (k.accidental === '#' || k.accidental === '♯') ? '#' : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b' : '';
             }
             currentSemitones = 0;
+            octaveShift = 0;
             displayTonicOverride = null;
+            enharmonicCycleList = [];
           }
         }
       } finally {
