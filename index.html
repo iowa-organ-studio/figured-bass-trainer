@@ -1102,9 +1102,14 @@
           if (!fr || !fr.ok) continue;
           const text = await fr.text();
           const meta = extractSecondSpineMeta(text || '');
-          const dir = (meta.dir || '').toLowerCase();
-          if (!filterAscending && dir === 'ascending') continue;
-          if (!filterDescending && dir === 'descending') continue;
+const dir = (meta.dir || '').toLowerCase();
+
+// treat values like "Descending Minor" or "Ascending (etc.)" as descending/ascending
+const isAsc = /\bascend/.test(dir);
+const isDesc = /\bdescend/.test(dir);
+
+if (!filterAscending && isAsc) continue;
+if (!filterDescending && isDesc) continue;
 
           const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
           if (!isNaN(num) && num > maxDifficulty) continue;
