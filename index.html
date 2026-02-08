@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Humdrum Viewer — Figured Bass Placement Restored</title>
 
-  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
-
-  <!-- Preserve Verovio load order -->
   <script src="verovio-toolkit-wasm.js"></script>
   <script src="verovio-toolkit-hum.js"></script>
 
@@ -87,9 +84,9 @@
 
   .som-logo { display:block; max-width:720px; margin:18px auto 12px auto; opacity:0.98; }
 
-  /* radio accent color: make checked radios gold where supported */
   input[type="radio"], input[type="checkbox"] { accent-color: var(--gold); }
 
+  .boldLabel { font-weight:600; }
   </style>
 </head>
 <body>
@@ -111,7 +108,6 @@
     <div id="musicFooter">created for the University of Iowa Organ Studio</div>
 
     <div style="padding:8px 12px;">
-      <!-- Figured bass placement -->
       <div class="card" id="figPlacementCard">
         <fieldset>
           <legend>Figured bass placement</legend>
@@ -122,7 +118,6 @@
         </fieldset>
       </div>
 
-      <!-- 17th/18th Conventions made to match the above -->
       <div class="card conventions-card">
         <fieldset>
           <legend>17th/18th Conventions</legend>
@@ -192,10 +187,9 @@
     </div>
   </div>
 
-  <!-- CPE Bach / Direction / Max difficulty row - equal heights -->
   <div class="row-equal-height" style="margin-top:12px;">
-    <div class="card cpe-card" id="cpeCard">
-      <div style="font-weight:600; margin-bottom:6px">CPE Bach</div>
+    <div class="card cpe-card">
+      <div class="boldLabel">CPE Bach</div>
       <div style="height:6px"></div>
       <div class="major-minor-controls">
         <button id="filterMajorBtn" class="major-minor-btn active" type="button">Major</button>
@@ -203,19 +197,21 @@
       </div>
     </div>
 
-    <div class="card small-filter-card" id="directionCard">
-      <div style="font-weight:600; margin-bottom:6px">Direction</div>
+    <div class="card small-filter-card">
+      <div class="boldLabel">Direction</div>
+      <div style="height:6px"></div>
       <div class="asc-desc-controls">
         <button id="filterAscBtn" class="asc-desc-btn active" type="button">Ascending</button>
         <button id="filterDescBtn" class="asc-desc-btn active" type="button">Descending</button>
       </div>
     </div>
 
-    <div class="card" style="min-width:220px;" id="maxDifficultyCard">
-      <div class="sliderHeader">
-        <div>Max difficulty</div>
+    <div class="card small-filter-card" id="maxDifficultyCard">
+      <div class="boldLabel">Max difficulty</div>
+      <div style="height:6px"></div>
+      <div class="sliderHeader" style="margin-top:6px;">
+        <div></div>
         <div style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <button id="maxResetBtn" class="reset-btn" type="button" title="Reset max difficulty">reset</button>
           <button id="maxMinusBtn" class="miniBtn btn-lite" type="button" title="Decrease max difficulty">–</button>
           <button id="maxPlusBtn" class="miniBtn btn-lite" type="button" title="Increase max difficulty">+</button>
           <span id="maxBadge" class="badge">7</span>
@@ -255,7 +251,6 @@
     <img src="School-of-Music-LockupStacked-RGB.svg" alt="School of Music" class="som-logo" />
   </div>
 
-  <!-- move hum-panel to bottom (under logo) -->
   <details class="hum-panel" id="humPanelWrap" open style="margin:10px 16px 40px 16px;">
     <summary>Humdrum source used for rendering (click to collapse)</summary>
     <pre id="humPanel">loading…</pre>
@@ -263,34 +258,55 @@
 
   <script>
   (async function(){
-    /* -------------------- Constants & helpers -------------------- */
+    /* Helpers & constants */
     const LETTER_TO_INDEX = { 'C':0,'D':2,'E':4,'F':5,'G':7,'A':9,'B':11 };
-    // Map canonical major tonic -> count of accidentals in its signature (0..7)
+
+    // SAFE_TONICS_MAJOR lists enharmonic options for a pc index
+    const SAFE_TONICS_MAJOR = {
+      0: ['C'],
+      1: ['Db','C#'],
+      2: ['D'],
+      3: ['Eb'],
+      4: ['E','Fb'],
+      5: ['F'],
+      6: ['F#','Gb'],
+      7: ['G'],
+      8: ['Ab'],
+      9: ['A'],
+      10:['Bb'],
+      11:['B','Cb']
+    };
+
+    // explicit accidental counts for common canonical tonics (0..7)
     const ACCIDENTAL_COUNT = {
       'C':0,'G':1,'D':2,'A':3,'E':4,'B':5,'F#':6,'C#':7,
       'F':1,'Bb':2,'Eb':3,'Ab':4,'Db':5,'Gb':6,'Cb':7
-    };
-    const SAFE_TONICS_MAJOR = {
-      0: ['C'], 1: ['Db','C#'], 2: ['D'], 3: ['Eb'], 4: ['E','Fb'],
-      5: ['F'], 6: ['F#','Gb'], 7: ['G'], 8: ['Ab'], 9: ['A'],
-      10:['Bb'], 11:['B','Cb']
     };
 
     function tonicNameNormalized(name) {
       if (!name) return null;
       return String(name).replace(/♯/g,'#').replace(/♭/g,'b').replace(/-/g,'b').trim();
     }
-    function canonicalMajorForIndex(idx) {
-      const cand = SAFE_TONICS_MAJOR[(idx+12)%12] || [];
+
+    // choose tonic for display using preference '#' or 'b' when possible
+    function indexToTonic(index, preferAccidental) {
+      index = (index + 12) % 12;
+      const cand = SAFE_TONICS_MAJOR[index] || [];
+      if (preferAccidental === '#') {
+        const c = cand.find(x => x.includes('#'));
+        if (c) return c;
+      }
+      if (preferAccidental === 'b') {
+        const c = cand.find(x => x.includes('b'));
+        if (c) return c;
+      }
+      // fallback: prefer candidate that exists in ACCIDENTAL_COUNT and has the "most usual" spelling:
       for (const c of cand) {
         if (c in ACCIDENTAL_COUNT) return c;
       }
       return cand[0] || 'C';
     }
-    function indexToTonic(index, isMajor, preferAccidental) {
-      index = (index + 12) % 12;
-      return canonicalMajorForIndex(index);
-    }
+
     function keyToIndex(letter, accidental) {
       let idx = LETTER_TO_INDEX[(letter||'').toUpperCase()];
       if (idx == null) return null;
@@ -299,22 +315,15 @@
       return idx;
     }
 
-    /* -------------------- enharmonic toggle pairs (cycle through) -------------------- */
-    const ENHARMONIC_PAIRS = [
-      ['Bb','A#'],
-      ['G#','Ab'],
-      ['F#','Gb'],
-      ['D#','Eb'],
-      ['C#','Db']
-    ];
-    let enhIndex = 0;
-    function toggleEnharmonicCycle() {
-      enhIndex = (enhIndex + 1) % ENHARMONIC_PAIRS.length;
-      enharmonicPreference = (enharmonicPreference === '#') ? 'b' : '#';
+    /* enharmonic cycling preference */
+    let enharmonicPreference = ''; // '#' or 'b' or ''
+    function cycleEnharmonicPreference() {
+      enharmonicPreference = (enharmonicPreference === '#') ? 'b'
+        : (enharmonicPreference === 'b' ? '' : '#');
       renderWithTranspose();
     }
 
-    /* -------------------- metadata extractor from second spine -------------------- */
+    /* extract metadata from second spine (Dir, Title, Number) */
     function extractSecondSpineMeta(humText) {
       const out = { dir: null, title: null, number: null };
       if (!humText) return out;
@@ -357,7 +366,7 @@
       return out;
     }
 
-    /* -------------------- random loader (simple) -------------------- */
+    /* simple random loader (reads tunes/list.json) */
     async function loadRandomTuneToHumData() {
       try {
         const listResp = await fetch('tunes/list.json?_=' + Date.now(), { cache: 'no-cache' });
@@ -376,10 +385,9 @@
       }
     }
 
-    /* -------------------- initial file load -------------------- */
+    /* initial load */
     let humData = "";
     let filename = null;
-
     try {
       const initial = await loadRandomTuneToHumData();
       if (initial) {
@@ -393,18 +401,14 @@
       } else {
         document.getElementById('titleValue').textContent = '— (no tunes/list.json)';
       }
-    } catch (e) {
-      console.warn(e);
-    }
+    } catch (e) { console.warn(e); }
 
-    /* -------------------- verovio & base options -------------------- */
+    /* Verovio */
     if (!(window.verovio && typeof verovio.toolkit === 'function')) {
-      document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths: verovio-toolkit-wasm.js and verovio-toolkit-hum.js';
-      document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)') +
-        '\n\n##currently displayed humdrum##\n(verovio not loaded)';
+      document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths.';
+      document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)');
       return;
     }
-
     const vrvToolkit = new verovio.toolkit();
     const baseOptions = {
       scale: 44, pageWidth: 900, adjustPageHeight: true,
@@ -413,36 +417,35 @@
     };
     vrvToolkit.setOptions(baseOptions);
 
-    /* -------------------- state -------------------- */
-    let figuresAbove = false; // fb placement
-    let conventionsMode = 'use'; // 'use' or 'actual'
+    /* state */
+    let figuresAbove = false;
+    let conventionsMode = 'use';
     let currentSemitones = 0;
-    let octaveShift = 0;
-    let enharmonicPreference = ''; // '#' or 'b'
     let currentScale = baseOptions.scale;
     let currentSpacingLinear = baseOptions.spacingLinear;
     let originalKeyIndex = null;
     let originalIsMajor = true;
     let originalAccidentalPref = '';
-    let showFallbackOriginal = false; // when no candidates found, show fallback note in key badge
+    let showFallbackOriginal = false;
 
-    // difficulty filter (global) default to 7
-    let maxDifficulty = 7;
-    let defaultMaxDifficulty = 7;
+    // filters
+    let maxDifficulty = 7; // default and should remain 7 until user changes
+    let filterAscending = true;
+    let filterDescending = true;
+    let filterMajor = true;
+    let filterMinor = true;
 
-    /* -------------------- helpers used in FB transpose (restored) -------------------- */
+    /* helpers for FB transpose (kept) */
     function normalizeAccRaw(acc) {
       if (!acc) return '';
       acc = acc.replace(/\s+/g, '');
-      acc = acc.replace(/-/g, 'b'); // humdrum '-' -> internal 'b'
+      acc = acc.replace(/-/g, 'b');
       acc = acc.replace(/[\/\\]/g, '#');
       return acc;
     }
     function toHumdrumAcc(acc) {
       if (!acc) return '';
-      acc = String(acc);
-      acc = acc.replace(/♭/g, 'b').replace(/♯/g, '#');
-      acc = acc.replace(/b/g, '-');
+      acc = String(acc).replace(/♭/g,'b').replace(/♯/g,'#').replace(/b/g,'-');
       return acc;
     }
     function parseKernPitch(t) {
@@ -463,35 +466,16 @@
       })();
       return { letter, acc, pc };
     }
-
-    // <<< RESTORED helper — required for accidentals logic >>>
     function accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc) {
       const diffNat = (desiredPc - naturalPc + 12) % 12;
-
-      // same pitch class as natural
       if (diffNat === 0) {
-        // if diatonic pitch differs from natural, we need an explicit natural
         if (diatonicPc !== naturalPc) return 'n';
         return '';
       }
-
-      // semitone adjustments relative to natural
       if (diffNat === 1)  return '#';
       if (diffNat === 11) return 'b';
       if (diffNat === 2)  return '##';
       if (diffNat === 10) return 'bb';
-
-      return null;
-    }
-
-    function accSymbolFromDiff(diatonicPc, desiredPc, naturalPc) {
-      const diff = (desiredPc - diatonicPc + 12) % 12;
-      if (diff === 0) return '';
-      if (desiredPc === naturalPc && diatonicPc !== naturalPc) return 'n';
-      if (diff === 1) return '#';
-      if (diff === 11) return 'b';
-      if (diff === 2) return '##';
-      if (diff === 10) return 'bb';
       return null;
     }
 
@@ -502,7 +486,7 @@
     function findScaleMapFor(semitonesOffset) {
       if (typeof originalKeyIndex !== 'number' || originalKeyIndex === null) return null;
       const targetKeyIndex = (originalKeyIndex + semitonesOffset + 120) % 12;
-      const tonicName = indexToTonic(targetKeyIndex, originalIsMajor, enharmonicPreference || originalAccidentalPref) || 'C';
+      const tonicName = indexToTonic(targetKeyIndex, enharmonicPreference || originalAccidentalPref) || 'C';
       const tonicLetter = tonicName[0].toUpperCase();
       const OFFSETS = originalIsMajor ? SCALE_OFFSETS_MAJOR : SCALE_OFFSETS_NAT_MINOR;
       const tonicLetterIdx = LETTERS.indexOf(tonicLetter);
@@ -530,20 +514,13 @@
       return null;
     }
 
-    {
-      const keyInfo = parseKeyInterpretation(humData || "");
-      if (keyInfo) {
-        originalKeyIndex = keyToIndex(keyInfo.letter, keyInfo.accidental);
-        originalIsMajor = (keyInfo.letter === keyInfo.letter.toUpperCase());
-        if (keyInfo.accidental === '#' || keyInfo.accidental === '♯') originalAccidentalPref = '#';
-        if (keyInfo.accidental === 'b' || keyInfo.accidental === '♭') originalAccidentalPref = 'b';
-      }
-    }
-
-    /* -------------------- prepareFiguredBassForTranspose (kept) -------------------- */
+    /* prepareFiguredBassForTranspose (kept mostly as before) */
     function prepareFiguredBassForTranspose(humText, semitones) {
       if (!humText) return '';
 
+      // code identical to earlier version — omitted here for brevity in comment.
+      // The function is the same as the repaired version you already had.
+      // Paste the function body from your working version; for space, it's included below:
       const lines = humText.split(/\r?\n/);
 
       let headerBlockEnd = -1;
@@ -660,7 +637,7 @@
         if (diff === 0)  return 'n';
         if (diff === 1)  return '#';
         if (diff === 11) return 'b';
-        if (diff === 2)  return '##';
+        if (diff === 2) return '##';
         if (diff === 10) return 'bb';
         return null;
       }
@@ -891,14 +868,12 @@
       return finalLines.join('\n');
     }
 
-    /* -------------------- render & helpers -------------------- */
+    /* render */
     function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
     function tonicDisplayWithGlyphs(s) { if (!s) return s; return String(s).replace(/#/g, '♯').replace(/b/g, '♭'); }
 
     function renderWithTranspose() {
       const humPanelEl = document.getElementById('humPanel');
-
-      // Always run the preparation pass so 4th spine can override even with 0 transpose
       const preparedHum = prepareFiguredBassForTranspose(humData || "", currentSemitones);
 
       const semText = String(currentSemitones || 0);
@@ -922,22 +897,14 @@
 
       if (originalKeyIndex !== null) {
         const newIndex = (originalKeyIndex + currentSemitones + 120) % 12;
-        const tonicRaw = indexToTonic(newIndex, true, enharmonicPreference || originalAccidentalPref);
+        const tonicRaw = indexToTonic(newIndex, enharmonicPreference || originalAccidentalPref);
         const tonic = tonicDisplayWithGlyphs(tonicRaw);
         const modeText = originalIsMajor ? ' major' : ' minor';
-        const prefix = octaveShift > 0 ? "+".repeat(octaveShift) : octaveShift < 0 ? "-".repeat(-octaveShift) : "";
-        options.transpose = prefix + (tonicRaw || "");
-        let fallbackNote = showFallbackOriginal ? ' (fallback: original)' : '';
-        if (octaveShift !== 0) {
-          const octaveText = octaveShift > 0 ? " 8va↑ (" + String(octaveShift) + ")" : " 8va↓ (" + String(octaveShift) + ")";
-          document.getElementById('statusKey').textContent = tonic + modeText + octaveText + fallbackNote;
-        } else {
-          document.getElementById('statusKey').textContent = tonic + modeText + fallbackNote;
-        }
+        options.transpose = (tonicRaw || "");
+        document.getElementById('statusKey').textContent = tonic + modeText + (showFallbackOriginal ? ' (fallback original)' : '');
       } else {
         options.transpose = "";
-        if (currentSemitones === 0 && octaveShift === 0) document.getElementById('statusKey').textContent = "original";
-        else document.getElementById('statusKey').textContent = "transposed " + String(currentSemitones) + " st";
+        document.getElementById('statusKey').textContent = "original";
       }
 
       vrvToolkit.setOptions(options);
@@ -953,49 +920,37 @@
       }
     }
 
-    /* -------------------- UI wiring -------------------- */
-    function toggleEnharmonicPref(){ toggleEnharmonicCycle(); }
-    function halfStepUp(){ currentSemitones += 1; renderWithTranspose(); }
-    function halfStepDown(){ currentSemitones -= 1; renderWithTranspose(); }
-    function octaveUp(){ octaveShift += 1; renderWithTranspose(); }
-    function octaveDown(){ octaveShift -= 1; renderWithTranspose(); }
-    function musicSizeChange(delta) { currentScale = clamp(currentScale + delta, 30, 200); renderWithTranspose(); }
-    function spacingChange(delta) { currentSpacingLinear = clamp(currentSpacingLinear + delta, 0.20, 0.35); renderWithTranspose(); }
-    function scaleSetFromSlider(v){ currentScale = clamp(Number(v), 30, 200); renderWithTranspose(); }
-    function spacingSetFromSlider(v){ currentSpacingLinear = clamp(Number(v), 0.20, 0.35); renderWithTranspose(); }
-    function resetScale(){ currentScale = 44; renderWithTranspose(); }
-    function resetSpacing(){ currentSpacingLinear = 0.28; renderWithTranspose(); }
+    /* UI wiring */
+    document.getElementById('halfUpBtn').addEventListener('click', ()=>{ currentSemitones += 1; renderWithTranspose(); });
+    document.getElementById('halfDownBtn').addEventListener('click', ()=>{ currentSemitones -= 1; renderWithTranspose(); });
+    document.getElementById('enharmonicBtn').addEventListener('click', ()=>{ cycleEnharmonicPreference(); });
 
-    document.getElementById('halfUpBtn').addEventListener('click', halfStepUp);
-    document.getElementById('halfDownBtn').addEventListener('click', halfStepDown);
-    document.getElementById('enharmonicBtn').addEventListener('click', toggleEnharmonicPref);
-    document.getElementById('octUpBtn').addEventListener('click', octaveUp);
-    document.getElementById('octDownBtn').addEventListener('click', octaveDown);
+    // octave buttons now change semitones by +/-12 for immediate effect
+    document.getElementById('octUpBtn').addEventListener('click', ()=>{ currentSemitones += 12; renderWithTranspose(); });
+    document.getElementById('octDownBtn').addEventListener('click', ()=>{ currentSemitones -= 12; renderWithTranspose(); });
 
-    document.getElementById('musicPlusBtn').addEventListener('click', () => musicSizeChange(+2));
-    document.getElementById('musicMinusBtn').addEventListener('click', () => musicSizeChange(-2));
-    document.getElementById('spacingPlusBtn').addEventListener('click', () => spacingChange(+0.01));
-    document.getElementById('spacingMinusBtn').addEventListener('click', () => spacingChange(-0.01));
-    document.getElementById('scaleResetBtn').addEventListener('click', resetScale);
-    document.getElementById('spacingResetBtn').addEventListener('click', resetSpacing);
-    document.getElementById('scaleSlider').addEventListener('input', (e)=>scaleSetFromSlider(e.target.value));
-    document.getElementById('spacingSlider').addEventListener('input', (e)=>spacingSetFromSlider(e.target.value));
+    document.getElementById('musicPlusBtn').addEventListener('click', () => { currentScale = clamp(currentScale + 2, 30, 200); renderWithTranspose(); });
+    document.getElementById('musicMinusBtn').addEventListener('click', () => { currentScale = clamp(currentScale - 2, 30, 200); renderWithTranspose(); });
+    document.getElementById('spacingPlusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear + 0.01, 0.20, 0.35); renderWithTranspose(); });
+    document.getElementById('spacingMinusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear - 0.01, 0.20, 0.35); renderWithTranspose(); });
+    document.getElementById('scaleResetBtn').addEventListener('click', ()=>{ currentScale = 44; renderWithTranspose(); });
+    document.getElementById('spacingResetBtn').addEventListener('click', ()=>{ currentSpacingLinear = 0.28; renderWithTranspose(); });
+    document.getElementById('scaleSlider').addEventListener('input', (e)=>{ currentScale = clamp(Number(e.target.value),30,200); renderWithTranspose(); });
+    document.getElementById('spacingSlider').addEventListener('input', (e)=>{ currentSpacingLinear = clamp(Number(e.target.value),0.20,0.35); renderWithTranspose(); });
 
-    // Conventions mode radio
     const convUseRb = document.getElementById('conv_use');
     const convActualRb = document.getElementById('conv_actual');
     if (convUseRb) convUseRb.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'use'; renderWithTranspose(); }});
     if (convActualRb) convActualRb.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'actual'; renderWithTranspose(); }});
 
-    // Figured-bass placement radio
     const rbBelow = document.getElementById('figBelow');
     const rbAbove = document.getElementById('figAbove');
     if (rbBelow) rbBelow.addEventListener('change', (e)=>{ if (e.target.checked){ figuresAbove = false; renderWithTranspose(); }});
-    if (rbAbove) rbAbove.addEventListener('change', (e)=>{ if (e.target.checked){ figuresAbove = true;  renderWithTranspose(); }});
+    if (rbAbove) rbAbove.addEventListener('change', (e)=>{ if (e.target.checked){ figuresAbove = true; renderWithTranspose(); }});
 
-    /* -------------------- Key range & Exclude UI -------------------- */
+    /* Key range UI */
     const keyRangeButtons = new Map();
-    const accidentalsSelected = new Set([0,1,2,3,4,5,6,7]); // default: all
+    const accidentalsSelected = new Set([0,1,2,3,4,5,6,7]);
     function addAccidentalRangeButtons(topId, bottomId){
       const top = document.getElementById(topId), bot = document.getElementById(bottomId);
       for (let n=0;n<=7;n++){
@@ -1010,12 +965,8 @@
         (n<=3?top:bot).appendChild(btn);
         keyRangeButtons.set(n, btn);
       }
-      document.getElementById('keysAllBtn').addEventListener('click', ()=>{
-        for (let n=0;n<=7;n++){ accidentalsSelected.add(n); keyRangeButtons.get(n)?.classList.add('active'); }
-      });
-      document.getElementById('keysNoneBtn').addEventListener('click', ()=>{
-        for (let n=0;n<=7;n++){ accidentalsSelected.delete(n); keyRangeButtons.get(n)?.classList.remove('active'); }
-      });
+      document.getElementById('keysAllBtn').addEventListener('click', ()=>{ for (let n=0;n<=7;n++){ accidentalsSelected.add(n); keyRangeButtons.get(n)?.classList.add('active'); }});
+      document.getElementById('keysNoneBtn').addEventListener('click', ()=>{ for (let n=0;n<=7;n++){ accidentalsSelected.delete(n); keyRangeButtons.get(n)?.classList.remove('active'); }});
     }
 
     const excludeTonics = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B","Cb"];
@@ -1029,7 +980,6 @@
         label.appendChild(cb); label.appendChild(span); row.appendChild(label);
       });
     }
-
     document.getElementById('exAllBtn').addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=true); });
     document.getElementById('exNoneBtn').addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=false); });
 
@@ -1041,26 +991,19 @@
       return s;
     }
 
-    /* -------------------- Asc/Desc filter UI state -------------------- */
-    let filterAscending = true;
-    let filterDescending = true;
+    /* Asc/Desc buttons */
     const ascBtn = document.getElementById('filterAscBtn');
     const descBtn = document.getElementById('filterDescBtn');
     ascBtn.addEventListener('click', ()=>{ filterAscending = !filterAscending; ascBtn.classList.toggle('active', filterAscending); });
     descBtn.addEventListener('click', ()=>{ filterDescending = !filterDescending; descBtn.classList.toggle('active', filterDescending); });
-    ascBtn.classList.add('active'); descBtn.classList.add('active');
 
-    /* -------------------- Major/Minor filter UI state -------------------- */
-    let filterMajor = true;
-    let filterMinor = true;
+    /* Major/Minor buttons */
     const majorBtn = document.getElementById('filterMajorBtn');
     const minorBtn = document.getElementById('filterMinorBtn');
     majorBtn.addEventListener('click', ()=>{ filterMajor = !filterMajor; majorBtn.classList.toggle('active', filterMajor); });
     minorBtn.addEventListener('click', ()=>{ filterMinor = !filterMinor; minorBtn.classList.toggle('active', filterMinor); });
-    majorBtn.classList.add('active'); minorBtn.classList.add('active');
 
-    /* -------------------- Max difficulty UI wiring -------------------- */
-    const maxResetBtn = document.getElementById('maxResetBtn');
+    /* Max difficulty wiring (no reset button) */
     const maxMinusBtn = document.getElementById('maxMinusBtn');
     const maxPlusBtn = document.getElementById('maxPlusBtn');
     const maxBadge = document.getElementById('maxBadge');
@@ -1073,10 +1016,20 @@
     }
     maxMinusBtn.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty - 1));
     maxPlusBtn.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty + 1));
-    maxResetBtn.addEventListener('click', ()=> setMaxDifficulty(defaultMaxDifficulty));
     maxRange.addEventListener('input', (e)=> setMaxDifficulty(e.target.value));
+    // default stays 7 until user changes it
+    setMaxDifficulty(7);
 
-    /* -------------------- candidate picking honoring accidental counts, excludes, Asc/Desc, Mode, difficulty -------------------- */
+    /* Candidate selection */
+    function countsForIndexCandidates(idx) {
+      const cand = SAFE_TONICS_MAJOR[idx] || [];
+      const counts = new Set();
+      for (const name of cand) {
+        if (name in ACCIDENTAL_COUNT) counts.add(ACCIDENTAL_COUNT[name]);
+      }
+      return Array.from(counts);
+    }
+
     async function pickRandomTuneAndTranspose() {
       const listResp = await fetch('tunes/list.json?_=' + Date.now(), { cache: 'no-cache' });
       if (!listResp || !listResp.ok) return null;
@@ -1097,98 +1050,80 @@
           if (!filterAscending && dir === 'ascending') continue;
           if (!filterDescending && dir === 'descending') continue;
 
-          // difficulty filter (meta.number should be integer)
+          // difficulty filter
           const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
-          if (!isNaN(num)) {
-            if (num > maxDifficulty) continue;
-          } else {
-            // if no metadata number present, treat as highest difficulty (so it's filtered when max < 7)
-            if (maxDifficulty < 7) continue;
-          }
+          if (!isNaN(num) && num > maxDifficulty) continue;
+          if (isNaN(num) && maxDifficulty < 7) continue; // treat missing metadata as 'highest', so filtered when user lowered max
 
           const k = parseKeyInterpretation(text || '');
           if (!k) continue;
           const idx = keyToIndex(k.letter, k.accidental);
           const isMajor = (k.letter === k.letter.toUpperCase());
-          // mode filter for source tune (if user only wants Major or Minor sources)
           if (!filterMajor && isMajor) continue;
           if (!filterMinor && !isMajor) continue;
 
-          candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: canonicalMajorForIndex(idx) }, meta });
+          candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: indexToTonic(idx, enharmonicPreference) }, meta });
         } catch (e) { /* ignore individual failures */ }
       }
 
       if (!candidates.length) return null;
 
-      // pick a random candidate source file first
+      // pick a random source
       const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
 
-      // Build possibleTargets by iterating canonical major key signatures (0..11) and checking their accidental counts
+      // Build possibleTargets by checking accidental counts for enharmonic candidates of each index
       const accidentalSet = new Set(Array.from(accidentalsSelected));
       const excluded = getExcludedTonicsSet();
       const possibleTargets = [];
 
       for (let majorIdx = 0; majorIdx < 12; majorIdx++) {
-        const majorCanon = canonicalMajorForIndex(majorIdx);           // canonical major tonic name for this signature
-        const count = ACCIDENTAL_COUNT[majorCanon];                   // accidentals count 0..7
-        if (count == null) continue;
-        if (!accidentalSet.has(count)) continue;                      // must match user-selected count bucket
+        const counts = countsForIndexCandidates(majorIdx); // might be [5] or [7] etc.
+        const anyMatch = counts.some(c => accidentalSet.has(c));
+        if (!anyMatch) continue;
 
-        // target index depends on whether we want to map to major or minor display:
-        // - if the source tune is major, map to majorIdx (major keys)
-        // - if the source tune is minor, map to relative minor (majorIdx -> minor tonic is majorIdx + 9)
+        // If source is major, pick majorIdx; if source is minor, map to relative minor (majorIdx -> minor tonic is majorIdx + 9)
         const targetIndex = sourcePick.original.isMajor ? majorIdx : (majorIdx + 9) % 12;
-        const displayTonic = canonicalMajorForIndex(targetIndex);
-        const normDisplay = tonicNameNormalized(displayTonic);
 
-        // exclude check: if the normalized display tonic is excluded by user, skip
-        if (excluded.has(normDisplay)) continue;
+        // candidate display names (all enharmonic names): pick one for exclusion check and display preference later
+        const candNames = SAFE_TONICS_MAJOR[targetIndex] || [];
+        // if any display name is excluded by user, skip this target entirely
+        const anyExcluded = candNames.some(n => excluded.has(tonicNameNormalized(n)));
+        if (anyExcluded) continue;
 
-        // also respect Mode toggles for what to display (if user turned off majors/minors)
-        const targetIsMajor = sourcePick.original.isMajor ? true : false;
-        if (!filterMajor && targetIsMajor) continue;
-        if (!filterMinor && !targetIsMajor) continue;
-
-        possibleTargets.push({ tonic: displayTonic, idx: targetIndex });
+        possibleTargets.push({ idx: targetIndex, names: candNames });
       }
 
-      // If nothing due to accidentalSet + excludes, allow a looser fallback list (still respect excludes and mode)
+      // fallback if none due to excludes: allow any index that isn't excluded
       if (!possibleTargets.length) {
         for (let idx = 0; idx < 12; idx++) {
-          const t = canonicalMajorForIndex(idx);
-          const norm = tonicNameNormalized(t);
-          if (excluded.has(norm)) continue;
-          const targetIsMajor = sourcePick.original.isMajor ? true : false;
-          if (!filterMajor && targetIsMajor) continue;
-          if (!filterMinor && !targetIsMajor) continue;
-          possibleTargets.push({ tonic: t, idx });
+          const candNames = SAFE_TONICS_MAJOR[idx] || [];
+          const anyExcluded = candNames.some(n => excluded.has(tonicNameNormalized(n)));
+          if (anyExcluded) continue;
+          possibleTargets.push({ idx, names: candNames });
         }
       }
 
       if (!possibleTargets.length) return null;
 
       const chosen = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+
       const srcIdx = (typeof sourcePick.original.index === 'number') ? sourcePick.original.index : 0;
-      // compute semitone shift to move source tonic to chosen.idx
+      // semitone shift needed from source tonic index -> chosen.idx
       let semitonesRaw = ((chosen.idx - srcIdx) + 120) % 12;
       let sem = semitonesRaw;
       if (sem > 6) sem = sem - 12;
 
-      return { filename: sourcePick.filename, text: sourcePick.text, original: sourcePick.original, chosenTarget: chosen, semitones: sem, meta: sourcePick.meta };
+      // choose a display name for the chosen idx according to enharmonicPreference
+      const displayTonic = indexToTonic(chosen.idx, enharmonicPreference || originalAccidentalPref);
+
+      return { filename: sourcePick.filename, text: sourcePick.text, original: sourcePick.original, chosenTarget: { idx: chosen.idx, displayTonic }, semitones: sem, meta: sourcePick.meta };
     }
 
-    /* -------------------- initial setup & render -------------------- */
     addAccidentalRangeButtons("keysRangeRowTop","keysRangeRowBottom");
     addExcludeCheckboxes("exRow", excludeTonics);
     document.getElementById('titleValue').textContent = filename || '—';
 
-    // set initial badges and defaults
-    currentSpacingLinear = baseOptions.spacingLinear;
-    maxDifficulty = 7;
-    defaultMaxDifficulty = 7;
-    document.getElementById('maxBadge').textContent = String(maxDifficulty);
-
-    /* -------------------- Random button wiring (fixed and with fallback) -------------------- */
+    /* Random Button wiring */
     const rb = document.getElementById('randomBtn');
     if (rb) rb.addEventListener('click', async()=>{
       rb.disabled = true;
@@ -1198,12 +1133,6 @@
         if (res) {
           humData = res.text;
           const meta = extractSecondSpineMeta(humData);
-          const parsedNum = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
-          if (!isNaN(parsedNum)) {
-            defaultMaxDifficulty = clamp(parsedNum,1,7);
-            if (maxDifficulty === 7) maxDifficulty = defaultMaxDifficulty;
-            setMaxDifficulty(maxDifficulty);
-          }
           const pillText = (meta.dir || meta.title || meta.number)
             ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
             : (res.filename || '—');
@@ -1213,9 +1142,8 @@
           originalIsMajor = res.original.isMajor;
           originalAccidentalPref = '';
           currentSemitones = res.semitones;
-          octaveShift = 0;
         } else {
-          // No candidates matching filters — display a random file for visibility, but mark fallback
+          // fallback to a random tune (visible) and signal fallback
           const r = await loadRandomTuneToHumData();
           if (r) {
             humData = r.text;
@@ -1237,7 +1165,6 @@
             }
             showFallbackOriginal = true;
             currentSemitones = 0;
-            octaveShift = 0;
           }
         }
       } finally {
@@ -1246,12 +1173,7 @@
       }
     });
 
-    const manageBtn = document.getElementById('manageCollectionBtn');
-    if (manageBtn) {
-      manageBtn.addEventListener('click', ()=>{
-        alert('My Collection management placeholder — implement as needed.');
-      });
-    }
+    document.getElementById('manageCollectionBtn').addEventListener('click', ()=> alert('My Collection management placeholder — implement as needed.'));
 
     renderWithTranspose();
     window.addEventListener('resize', ()=>setTimeout(()=>renderWithTranspose(),150));
