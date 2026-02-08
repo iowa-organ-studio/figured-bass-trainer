@@ -62,7 +62,6 @@
   .chip .label{ font-size:0.88rem; color:var(--muted); }
   .chip .value{ font-weight:600; margin-left:6px; font-size:0.95rem; }
 
-  /* Figured-bass placement and Conventions look same */
   #figPlacementCard, .conventions-card { width:360px; min-width:260px; margin:8px 10px 0 0; padding:6px; display:inline-block; vertical-align:top; }
   #figPlacementCard fieldset, .conventions-card fieldset { border:0;margin:0;padding:0; }
   #figPlacementCard legend, .conventions-card legend { font-weight:600; margin-bottom:6px; font-size:0.92rem; }
@@ -120,10 +119,10 @@
 
       <div class="card conventions-card">
         <fieldset>
-          <legend>17th/18th Conventions</legend>
+          <legend>Accidentals</legend>
           <div class="placement-row conventions-row">
-            <label><input type="radio" name="conventionsMode" id="conv_use" value="use" checked /> Use</label>
-            <label><input type="radio" name="conventionsMode" id="conv_actual" value="actual" /> Actual Accidentals</label>
+            <label><input type="radio" name="conventionsMode" id="conv_historic" value="historic" checked /> historic</label>
+            <label><input type="radio" name="conventionsMode" id="conv_modern" value="modern" /> modern</label>
           </div>
         </fieldset>
       </div>
@@ -154,7 +153,7 @@
             <span id="scaleBadge" class="badge">—</span>
           </div>
         </div>
-        <input id="scaleSlider" type="range" min="30" max="200" step="2" value="44" />
+        <input id="scaleSlider" type="range" min="30" max="200" step="2" value="50" />
       </div>
 
       <div class="card">
@@ -167,7 +166,8 @@
             <span id="spacingBadge" class="badge">—</span>
           </div>
         </div>
-        <input id="spacingSlider" type="range" min="0.20" max="0.35" step="0.01" value="0.28" />
+        <!-- max spacing increased to 0.50 -->
+        <input id="spacingSlider" type="range" min="0.20" max="0.50" step="0.01" value="0.32" />
       </div>
     </div>
 
@@ -176,7 +176,7 @@
       <div class="stackRow wrap">
         <button id="halfDownBtn" class="miniBtn btn-lite" type="button">–</button>
         <button id="halfUpBtn" class="miniBtn btn-lite" type="button">+</button>
-        <button id="enharmonicBtn" class="btn-green-pill" type="button" title="Toggle enharmonic spelling">♯/♭</button>
+        <button id="enharmonicBtn" class="btn-green-pill" type="button" title="Toggle enharmonic display">♯/♭</button>
       </div>
 
       <div class="stackTitle" style="margin-top:10px;">Octave</div>
@@ -258,26 +258,15 @@
 
   <script>
   (async function(){
-    /* Helpers & constants */
+    /* -------------------- Constants & helpers -------------------- */
     const LETTER_TO_INDEX = { 'C':0,'D':2,'E':4,'F':5,'G':7,'A':9,'B':11 };
 
-    // SAFE_TONICS_MAJOR lists enharmonic options for a pc index
     const SAFE_TONICS_MAJOR = {
-      0: ['C'],
-      1: ['Db','C#'],
-      2: ['D'],
-      3: ['Eb'],
-      4: ['E','Fb'],
-      5: ['F'],
-      6: ['F#','Gb'],
-      7: ['G'],
-      8: ['Ab'],
-      9: ['A'],
-      10:['Bb'],
-      11:['B','Cb']
+      0: ['C'], 1: ['Db','C#'], 2: ['D'], 3: ['Eb'], 4: ['E','Fb'],
+      5: ['F'], 6: ['F#','Gb'], 7: ['G'], 8: ['Ab'], 9: ['A'],
+      10:['Bb'], 11:['B','Cb']
     };
 
-    // explicit accidental counts for common canonical tonics (0..7)
     const ACCIDENTAL_COUNT = {
       'C':0,'G':1,'D':2,'A':3,'E':4,'B':5,'F#':6,'C#':7,
       'F':1,'Bb':2,'Eb':3,'Ab':4,'Db':5,'Gb':6,'Cb':7
@@ -288,23 +277,21 @@
       return String(name).replace(/♯/g,'#').replace(/♭/g,'b').replace(/-/g,'b').trim();
     }
 
-    // choose tonic for display using preference '#' or 'b' when possible
     function indexToTonic(index, preferAccidental) {
       index = (index + 12) % 12;
-      const cand = SAFE_TONICS_MAJOR[index] || [];
+      const candidates = SAFE_TONICS_MAJOR[index] || [];
       if (preferAccidental === '#') {
-        const c = cand.find(x => x.includes('#'));
+        const c = candidates.find(x => x.includes('#'));
         if (c) return c;
       }
       if (preferAccidental === 'b') {
-        const c = cand.find(x => x.includes('b'));
+        const c = candidates.find(x => x.includes('b'));
         if (c) return c;
       }
-      // fallback: prefer candidate that exists in ACCIDENTAL_COUNT and has the "most usual" spelling:
-      for (const c of cand) {
+      for (const c of candidates) {
         if (c in ACCIDENTAL_COUNT) return c;
       }
-      return cand[0] || 'C';
+      return candidates[0] || 'C';
     }
 
     function keyToIndex(letter, accidental) {
@@ -315,15 +302,27 @@
       return idx;
     }
 
-    /* enharmonic cycling preference */
-    let enharmonicPreference = ''; // '#' or 'b' or ''
-    function cycleEnharmonicPreference() {
-      enharmonicPreference = (enharmonicPreference === '#') ? 'b'
-        : (enharmonicPreference === 'b' ? '' : '#');
+    /* -------------------- enharmonic display toggle -------------------- */
+    // This is display-only: cycles through possible enharmonic names for the CURRENT display tonic.
+    let displayTonicOverride = null;
+    function toggleEnharmonicDisplay() {
+      // compute the current display index
+      if (originalKeyIndex === null) return;
+      const displayIndex = (originalKeyIndex + currentSemitones + 120) % 12;
+      const names = SAFE_TONICS_MAJOR[displayIndex] || [indexToTonic(displayIndex, '')];
+      if (!names.length) return;
+      // If override not set, choose next name that's different than current name
+      const currentName = displayTonicOverride || indexToTonic(displayIndex, originalAccidentalPref || '');
+      // find index of currentName in names (match normalized)
+      let i = names.findIndex(n => tonicNameNormalized(n) === tonicNameNormalized(currentName));
+      if (i === -1) i = 0;
+      const next = names[(i+1) % names.length];
+      // if only one name, toggling will just keep the same; that's fine
+      displayTonicOverride = tonicNameNormalized(next) === tonicNameNormalized(currentName) ? null : next;
       renderWithTranspose();
     }
 
-    /* extract metadata from second spine (Dir, Title, Number) */
+    /* -------------------- meta extraction -------------------- */
     function extractSecondSpineMeta(humText) {
       const out = { dir: null, title: null, number: null };
       if (!humText) return out;
@@ -366,7 +365,7 @@
       return out;
     }
 
-    /* simple random loader (reads tunes/list.json) */
+    /* -------------------- safe random loader -------------------- */
     async function loadRandomTuneToHumData() {
       try {
         const listResp = await fetch('tunes/list.json?_=' + Date.now(), { cache: 'no-cache' });
@@ -385,9 +384,10 @@
       }
     }
 
-    /* initial load */
+    /* -------------------- initial file load -------------------- */
     let humData = "";
     let filename = null;
+
     try {
       const initial = await loadRandomTuneToHumData();
       if (initial) {
@@ -403,39 +403,39 @@
       }
     } catch (e) { console.warn(e); }
 
-    /* Verovio */
+    /* -------------------- verovio & base options -------------------- */
     if (!(window.verovio && typeof verovio.toolkit === 'function')) {
-      document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths.';
+      document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths: verovio-toolkit-wasm.js and verovio-toolkit-hum.js';
       document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)');
       return;
     }
+
     const vrvToolkit = new verovio.toolkit();
     const baseOptions = {
-      scale: 44, pageWidth: 900, adjustPageHeight: true,
-      spacingLinear: 0.28, spacingNonLinear: 0.46,
+      scale: 50, pageWidth: 900, adjustPageHeight: true,
+      spacingLinear: 0.32, spacingNonLinear: 0.46,
       spacingSystem: 10, spacingStaff: 8
     };
     vrvToolkit.setOptions(baseOptions);
 
-    /* state */
+    /* -------------------- state -------------------- */
     let figuresAbove = false;
-    let conventionsMode = 'use';
+    let conventionsMode = 'historic';
     let currentSemitones = 0;
     let currentScale = baseOptions.scale;
     let currentSpacingLinear = baseOptions.spacingLinear;
     let originalKeyIndex = null;
     let originalIsMajor = true;
     let originalAccidentalPref = '';
-    let showFallbackOriginal = false;
 
     // filters
-    let maxDifficulty = 7; // default and should remain 7 until user changes
+    let maxDifficulty = 7;
     let filterAscending = true;
     let filterDescending = true;
     let filterMajor = true;
     let filterMinor = true;
 
-    /* helpers for FB transpose (kept) */
+    /* -------------------- figures helpers -------------------- */
     function normalizeAccRaw(acc) {
       if (!acc) return '';
       acc = acc.replace(/\s+/g, '');
@@ -448,6 +448,7 @@
       acc = String(acc).replace(/♭/g,'b').replace(/♯/g,'#').replace(/b/g,'-');
       return acc;
     }
+
     function parseKernPitch(t) {
       if (!t) return null;
       const m = String(t).match(/([A-Ga-g])([#♯b♭-]{0,2})/);
@@ -466,19 +467,21 @@
       })();
       return { letter, acc, pc };
     }
+
     function accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc) {
       const diffNat = (desiredPc - naturalPc + 12) % 12;
       if (diffNat === 0) {
         if (diatonicPc !== naturalPc) return 'n';
         return '';
       }
-      if (diffNat === 1)  return '#';
+      if (diffNat === 1) return '#';
       if (diffNat === 11) return 'b';
-      if (diffNat === 2)  return '##';
+      if (diffNat === 2) return '##';
       if (diffNat === 10) return 'bb';
       return null;
     }
 
+    /* -------------------- diatonic map (mode aware) -------------------- */
     const LETTERS = ['C','D','E','F','G','A','B'];
     const SCALE_OFFSETS_MAJOR = [0,2,4,5,7,9,11];
     const SCALE_OFFSETS_NAT_MINOR = [0,2,3,5,7,8,10];
@@ -486,7 +489,7 @@
     function findScaleMapFor(semitonesOffset) {
       if (typeof originalKeyIndex !== 'number' || originalKeyIndex === null) return null;
       const targetKeyIndex = (originalKeyIndex + semitonesOffset + 120) % 12;
-      const tonicName = indexToTonic(targetKeyIndex, enharmonicPreference || originalAccidentalPref) || 'C';
+      const tonicName = indexToTonic(targetKeyIndex, originalAccidentalPref) || 'C';
       const tonicLetter = tonicName[0].toUpperCase();
       const OFFSETS = originalIsMajor ? SCALE_OFFSETS_MAJOR : SCALE_OFFSETS_NAT_MINOR;
       const tonicLetterIdx = LETTERS.indexOf(tonicLetter);
@@ -514,20 +517,18 @@
       return null;
     }
 
-    /* prepareFiguredBassForTranspose (kept mostly as before) */
+    /* -------------------- prepareFiguredBassForTranspose -------------------- */
+    // (kept — same as last working implementation)
     function prepareFiguredBassForTranspose(humText, semitones) {
       if (!humText) return '';
 
-      // code identical to earlier version — omitted here for brevity in comment.
-      // The function is the same as the repaired version you already had.
-      // Paste the function body from your working version; for space, it's included below:
       const lines = humText.split(/\r?\n/);
 
       let headerBlockEnd = -1;
       let kernIndices = [];
       let fbIndex = null;
-      let actualTextIndex = null;
-      let forceTextIndex  = null;
+      let actualTextIndex = null;  // 3rd spine
+      let forceTextIndex  = null;  // 4th spine
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -801,7 +802,7 @@
 
         const fbTokSrc  = toks[fbIndex];
         const forceTok  = (forceTextIndex  != null) ? toks[forceTextIndex] : null;
-        const actualTok = (conventionsMode === 'actual' && actualTextIndex != null) ? toks[actualTextIndex] : null;
+        const actualTok = (conventionsMode === 'modern' && actualTextIndex != null) ? toks[actualTextIndex] : null;
 
         let processedParts = null;
 
@@ -868,16 +869,18 @@
       return finalLines.join('\n');
     }
 
-    /* render */
+    /* -------------------- render & helpers -------------------- */
     function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
     function tonicDisplayWithGlyphs(s) { if (!s) return s; return String(s).replace(/#/g, '♯').replace(/b/g, '♭'); }
+    function indexToTonicDisplay(idx) { return tonicDisplayWithGlyphs(indexToTonic((idx+12)%12, originalAccidentalPref)); }
 
     function renderWithTranspose() {
       const humPanelEl = document.getElementById('humPanel');
+
       const preparedHum = prepareFiguredBassForTranspose(humData || "", currentSemitones);
 
       const semText = String(currentSemitones || 0);
-      const actualAccLine = '##Actual Accidentals=' + (conventionsMode === 'actual' ? 'TRUE' : 'FALSE');
+      const actualAccLine = '##Actual Accidentals=' + (conventionsMode === 'modern' ? 'TRUE' : 'FALSE');
       const panelContent = [
         '##original humdrum file##',
         humData || '(empty)',
@@ -896,12 +899,12 @@
       };
 
       if (originalKeyIndex !== null) {
-        const newIndex = (originalKeyIndex + currentSemitones + 120) % 12;
-        const tonicRaw = indexToTonic(newIndex, enharmonicPreference || originalAccidentalPref);
+        const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
+        const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
         const tonic = tonicDisplayWithGlyphs(tonicRaw);
         const modeText = originalIsMajor ? ' major' : ' minor';
         options.transpose = (tonicRaw || "");
-        document.getElementById('statusKey').textContent = tonic + modeText + (showFallbackOriginal ? ' (fallback original)' : '');
+        document.getElementById('statusKey').textContent = tonic + modeText;
       } else {
         options.transpose = "";
         document.getElementById('statusKey').textContent = "original";
@@ -920,35 +923,37 @@
       }
     }
 
-    /* UI wiring */
-    document.getElementById('halfUpBtn').addEventListener('click', ()=>{ currentSemitones += 1; renderWithTranspose(); });
-    document.getElementById('halfDownBtn').addEventListener('click', ()=>{ currentSemitones -= 1; renderWithTranspose(); });
-    document.getElementById('enharmonicBtn').addEventListener('click', ()=>{ cycleEnharmonicPreference(); });
+    /* -------------------- UI wiring -------------------- */
+    document.getElementById('halfUpBtn').addEventListener('click', ()=>{ currentSemitones += 1; displayTonicOverride = null; renderWithTranspose(); });
+    document.getElementById('halfDownBtn').addEventListener('click', ()=>{ currentSemitones -= 1; displayTonicOverride = null; renderWithTranspose(); });
+    document.getElementById('enharmonicBtn').addEventListener('click', ()=>{ toggleEnharmonicDisplay(); });
 
-    // octave buttons now change semitones by +/-12 for immediate effect
-    document.getElementById('octUpBtn').addEventListener('click', ()=>{ currentSemitones += 12; renderWithTranspose(); });
-    document.getElementById('octDownBtn').addEventListener('click', ()=>{ currentSemitones -= 12; renderWithTranspose(); });
+    // Octave buttons: immediate +/-12 semitones
+    document.getElementById('octUpBtn').addEventListener('click', ()=>{ currentSemitones += 12; displayTonicOverride = null; renderWithTranspose(); });
+    document.getElementById('octDownBtn').addEventListener('click', ()=>{ currentSemitones -= 12; displayTonicOverride = null; renderWithTranspose(); });
 
     document.getElementById('musicPlusBtn').addEventListener('click', () => { currentScale = clamp(currentScale + 2, 30, 200); renderWithTranspose(); });
     document.getElementById('musicMinusBtn').addEventListener('click', () => { currentScale = clamp(currentScale - 2, 30, 200); renderWithTranspose(); });
-    document.getElementById('spacingPlusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear + 0.01, 0.20, 0.35); renderWithTranspose(); });
-    document.getElementById('spacingMinusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear - 0.01, 0.20, 0.35); renderWithTranspose(); });
-    document.getElementById('scaleResetBtn').addEventListener('click', ()=>{ currentScale = 44; renderWithTranspose(); });
-    document.getElementById('spacingResetBtn').addEventListener('click', ()=>{ currentSpacingLinear = 0.28; renderWithTranspose(); });
+    document.getElementById('spacingPlusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear + 0.01, 0.20, 0.50); renderWithTranspose(); });
+    document.getElementById('spacingMinusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear - 0.01, 0.20, 0.50); renderWithTranspose(); });
+    document.getElementById('scaleResetBtn').addEventListener('click', ()=>{ currentScale = baseOptions.scale; renderWithTranspose(); });
+    document.getElementById('spacingResetBtn').addEventListener('click', ()=>{ currentSpacingLinear = baseOptions.spacingLinear; renderWithTranspose(); });
     document.getElementById('scaleSlider').addEventListener('input', (e)=>{ currentScale = clamp(Number(e.target.value),30,200); renderWithTranspose(); });
-    document.getElementById('spacingSlider').addEventListener('input', (e)=>{ currentSpacingLinear = clamp(Number(e.target.value),0.20,0.35); renderWithTranspose(); });
+    document.getElementById('spacingSlider').addEventListener('input', (e)=>{ currentSpacingLinear = clamp(Number(e.target.value),0.20,0.50); renderWithTranspose(); });
 
-    const convUseRb = document.getElementById('conv_use');
-    const convActualRb = document.getElementById('conv_actual');
-    if (convUseRb) convUseRb.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'use'; renderWithTranspose(); }});
-    if (convActualRb) convActualRb.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'actual'; renderWithTranspose(); }});
+    // Accidentals radios
+    const convHist = document.getElementById('conv_historic');
+    const convMod = document.getElementById('conv_modern');
+    if (convHist) convHist.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'historic'; renderWithTranspose(); }});
+    if (convMod) convMod.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'modern'; renderWithTranspose(); }});
 
+    // Figured-bass placement radio
     const rbBelow = document.getElementById('figBelow');
     const rbAbove = document.getElementById('figAbove');
     if (rbBelow) rbBelow.addEventListener('change', (e)=>{ if (e.target.checked){ figuresAbove = false; renderWithTranspose(); }});
     if (rbAbove) rbAbove.addEventListener('change', (e)=>{ if (e.target.checked){ figuresAbove = true; renderWithTranspose(); }});
 
-    /* Key range UI */
+    /* -------------------- Key range & Exclude UI -------------------- */
     const keyRangeButtons = new Map();
     const accidentalsSelected = new Set([0,1,2,3,4,5,6,7]);
     function addAccidentalRangeButtons(topId, bottomId){
@@ -958,10 +963,7 @@
         btn.type='button';
         btn.className = 'range-btn' + (accidentalsSelected.has(n)?' active':'');
         btn.textContent = `${n}#/${n}♭`;
-        btn.addEventListener('click', ()=>{
-          if (accidentalsSelected.has(n)){ accidentalsSelected.delete(n); btn.classList.remove('active'); }
-          else { accidentalsSelected.add(n); btn.classList.add('active'); }
-        });
+        btn.addEventListener('click', ()=>{ if (accidentalsSelected.has(n)){ accidentalsSelected.delete(n); btn.classList.remove('active'); } else { accidentalsSelected.add(n); btn.classList.add('active'); } });
         (n<=3?top:bot).appendChild(btn);
         keyRangeButtons.set(n, btn);
       }
@@ -980,6 +982,7 @@
         label.appendChild(cb); label.appendChild(span); row.appendChild(label);
       });
     }
+
     document.getElementById('exAllBtn').addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=true); });
     document.getElementById('exNoneBtn').addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=false); });
 
@@ -991,36 +994,33 @@
       return s;
     }
 
-    /* Asc/Desc buttons */
+    /* -------------------- initial setup & render -------------------- */
+    addAccidentalRangeButtons("keysRangeRowTop","keysRangeRowBottom");
+    addExcludeCheckboxes("exRow", excludeTonics);
+    document.getElementById('titleValue').textContent = filename || '—';
+
+    /* -------------------- Asc/Desc, Major/Minor, Max difficulty -------------------- */
     const ascBtn = document.getElementById('filterAscBtn');
     const descBtn = document.getElementById('filterDescBtn');
     ascBtn.addEventListener('click', ()=>{ filterAscending = !filterAscending; ascBtn.classList.toggle('active', filterAscending); });
     descBtn.addEventListener('click', ()=>{ filterDescending = !filterDescending; descBtn.classList.toggle('active', filterDescending); });
 
-    /* Major/Minor buttons */
     const majorBtn = document.getElementById('filterMajorBtn');
     const minorBtn = document.getElementById('filterMinorBtn');
     majorBtn.addEventListener('click', ()=>{ filterMajor = !filterMajor; majorBtn.classList.toggle('active', filterMajor); });
     minorBtn.addEventListener('click', ()=>{ filterMinor = !filterMinor; minorBtn.classList.toggle('active', filterMinor); });
 
-    /* Max difficulty wiring (no reset button) */
     const maxMinusBtn = document.getElementById('maxMinusBtn');
     const maxPlusBtn = document.getElementById('maxPlusBtn');
     const maxBadge = document.getElementById('maxBadge');
     const maxRange = document.getElementById('maxRange');
-
-    function setMaxDifficulty(v) {
-      maxDifficulty = clamp(Number(v), 1, 7);
-      maxBadge.textContent = String(maxDifficulty);
-      maxRange.value = String(maxDifficulty);
-    }
+    function setMaxDifficulty(v) { maxDifficulty = clamp(Number(v),1,7); maxBadge.textContent = String(maxDifficulty); maxRange.value = String(maxDifficulty); }
     maxMinusBtn.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty - 1));
     maxPlusBtn.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty + 1));
     maxRange.addEventListener('input', (e)=> setMaxDifficulty(e.target.value));
-    // default stays 7 until user changes it
     setMaxDifficulty(7);
 
-    /* Candidate selection */
+    /* -------------------- Candidate selection logic (7#/7b handled) -------------------- */
     function countsForIndexCandidates(idx) {
       const cand = SAFE_TONICS_MAJOR[idx] || [];
       const counts = new Set();
@@ -1045,15 +1045,13 @@
           if (!fr || !fr.ok) continue;
           const text = await fr.text();
           const meta = extractSecondSpineMeta(text || '');
-          // direction filter
           const dir = (meta.dir || '').toLowerCase();
           if (!filterAscending && dir === 'ascending') continue;
           if (!filterDescending && dir === 'descending') continue;
 
-          // difficulty filter
           const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
           if (!isNaN(num) && num > maxDifficulty) continue;
-          if (isNaN(num) && maxDifficulty < 7) continue; // treat missing metadata as 'highest', so filtered when user lowered max
+          if (isNaN(num) && maxDifficulty < 7) continue;
 
           const k = parseKeyInterpretation(text || '');
           if (!k) continue;
@@ -1062,44 +1060,44 @@
           if (!filterMajor && isMajor) continue;
           if (!filterMinor && !isMajor) continue;
 
-          candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: indexToTonic(idx, enharmonicPreference) }, meta });
-        } catch (e) { /* ignore individual failures */ }
+          candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: indexToTonic(idx, '') }, meta });
+        } catch (e) { /* ignore single failures */ }
       }
 
       if (!candidates.length) return null;
 
-      // pick a random source
       const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
 
-      // Build possibleTargets by checking accidental counts for enharmonic candidates of each index
+      // Determine allowed target indices based on selected accidental-count buckets and mode
       const accidentalSet = new Set(Array.from(accidentalsSelected));
       const excluded = getExcludedTonicsSet();
       const possibleTargets = [];
 
-      for (let majorIdx = 0; majorIdx < 12; majorIdx++) {
-        const counts = countsForIndexCandidates(majorIdx); // might be [5] or [7] etc.
-        const anyMatch = counts.some(c => accidentalSet.has(c));
-        if (!anyMatch) continue;
+      for (let idx = 0; idx < 12; idx++) {
+        const countsMajor = countsForIndexCandidates(idx);
+        const countsMinor = countsForIndexCandidates((idx + 3) % 12); // relative major for minor
 
-        // If source is major, pick majorIdx; if source is minor, map to relative minor (majorIdx -> minor tonic is majorIdx + 9)
-        const targetIndex = sourcePick.original.isMajor ? majorIdx : (majorIdx + 9) % 12;
+        if (sourcePick.original.isMajor) {
+          const anyMatch = countsMajor.some(c => accidentalSet.has(c));
+          if (!anyMatch) continue;
+        } else {
+          const anyMatch = countsMinor.some(c => accidentalSet.has(c));
+          if (!anyMatch) continue;
+        }
 
-        // candidate display names (all enharmonic names): pick one for exclusion check and display preference later
-        const candNames = SAFE_TONICS_MAJOR[targetIndex] || [];
-        // if any display name is excluded by user, skip this target entirely
-        const anyExcluded = candNames.some(n => excluded.has(tonicNameNormalized(n)));
+        const names = SAFE_TONICS_MAJOR[idx] || [];
+        const anyExcluded = names.some(n => excluded.has(tonicNameNormalized(n)));
         if (anyExcluded) continue;
 
-        possibleTargets.push({ idx: targetIndex, names: candNames });
+        possibleTargets.push({ idx, names });
       }
 
-      // fallback if none due to excludes: allow any index that isn't excluded
       if (!possibleTargets.length) {
         for (let idx = 0; idx < 12; idx++) {
-          const candNames = SAFE_TONICS_MAJOR[idx] || [];
-          const anyExcluded = candNames.some(n => excluded.has(tonicNameNormalized(n)));
+          const names = SAFE_TONICS_MAJOR[idx] || [];
+          const anyExcluded = names.some(n => excluded.has(tonicNameNormalized(n)));
           if (anyExcluded) continue;
-          possibleTargets.push({ idx, names: candNames });
+          possibleTargets.push({ idx, names });
         }
       }
 
@@ -1108,26 +1106,17 @@
       const chosen = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
 
       const srcIdx = (typeof sourcePick.original.index === 'number') ? sourcePick.original.index : 0;
-      // semitone shift needed from source tonic index -> chosen.idx
       let semitonesRaw = ((chosen.idx - srcIdx) + 120) % 12;
       let sem = semitonesRaw;
       if (sem > 6) sem = sem - 12;
 
-      // choose a display name for the chosen idx according to enharmonicPreference
-      const displayTonic = indexToTonic(chosen.idx, enharmonicPreference || originalAccidentalPref);
-
-      return { filename: sourcePick.filename, text: sourcePick.text, original: sourcePick.original, chosenTarget: { idx: chosen.idx, displayTonic }, semitones: sem, meta: sourcePick.meta };
+      return { filename: sourcePick.filename, text: sourcePick.text, semitones: sem, meta: sourcePick.meta };
     }
 
-    addAccidentalRangeButtons("keysRangeRowTop","keysRangeRowBottom");
-    addExcludeCheckboxes("exRow", excludeTonics);
-    document.getElementById('titleValue').textContent = filename || '—';
-
-    /* Random Button wiring */
+    /* -------------------- Random button wiring -------------------- */
     const rb = document.getElementById('randomBtn');
     if (rb) rb.addEventListener('click', async()=>{
       rb.disabled = true;
-      showFallbackOriginal = false;
       try {
         const res = await pickRandomTuneAndTranspose();
         if (res) {
@@ -1138,12 +1127,24 @@
             : (res.filename || '—');
           document.getElementById('titleValue').textContent = pillText;
 
-          originalKeyIndex = res.original.index;
-          originalIsMajor = res.original.isMajor;
-          originalAccidentalPref = '';
+          const k = parseKeyInterpretation(humData||'');
+          if (k) {
+            originalKeyIndex = keyToIndex(k.letter, k.accidental);
+            originalIsMajor = (k.letter === k.letter.toUpperCase());
+            originalAccidentalPref =
+              (k.accidental === '#' || k.accidental === '♯') ? '#'
+              : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b'
+              : '';
+            enharmonicPreference = ''; // not used for toggling anymore
+          } else {
+            originalKeyIndex = null;
+            originalIsMajor = true;
+            originalAccidentalPref = '';
+          }
+
           currentSemitones = res.semitones;
+          displayTonicOverride = null; // reset the display toggle when new tune selected
         } else {
-          // fallback to a random tune (visible) and signal fallback
           const r = await loadRandomTuneToHumData();
           if (r) {
             humData = r.text;
@@ -1161,10 +1162,9 @@
                 (k.accidental === '#' || k.accidental === '♯') ? '#'
                 : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b'
                 : '';
-              enharmonicPreference = originalAccidentalPref || enharmonicPreference;
             }
-            showFallbackOriginal = true;
             currentSemitones = 0;
+            displayTonicOverride = null;
           }
         }
       } finally {
@@ -1174,6 +1174,13 @@
     });
 
     document.getElementById('manageCollectionBtn').addEventListener('click', ()=> alert('My Collection management placeholder — implement as needed.'));
+
+    // initialize UI display values
+    currentScale = baseOptions.scale;
+    currentSpacingLinear = baseOptions.spacingLinear;
+    document.getElementById('scaleBadge').textContent = String(currentScale);
+    document.getElementById('spacingBadge').textContent = currentSpacingLinear.toFixed(2);
+    document.getElementById('maxBadge').textContent = String(maxDifficulty);
 
     renderWithTranspose();
     window.addEventListener('resize', ()=>setTimeout(()=>renderWithTranspose(),150));
