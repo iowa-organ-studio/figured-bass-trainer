@@ -989,28 +989,17 @@ vrvToolkit.setOptions(baseOptions);
       if (humPanelEl) humPanelEl.textContent = panelContent;
 
     // spacing-aware options: use viewer width if available, guard missing base values, cap extremes
-const baseLinear = (typeof baseOptions.spacingLinear === 'number' && baseOptions.spacingLinear > 0)
-  ? baseOptions.spacingLinear
-  : 0.32; // safe fallback (your comment shows original default was 0.32)
+const baseLinear = baseOptions.spacingLinear || 0.32;
+const spacingNonLinearRatio =
+  (baseOptions.spacingNonLinear && baseOptions.spacingLinear)
+    ? baseOptions.spacingNonLinear / baseOptions.spacingLinear
+    : 1;
 
-const spacingNonLinearRatio = (typeof baseOptions.spacingNonLinear === 'number' && typeof baseOptions.spacingLinear === 'number' && baseOptions.spacingLinear > 0)
-  ? (baseOptions.spacingNonLinear / baseOptions.spacingLinear)
-  : 1;
-
-// how much wider we need relative to base
 const scaleFactor = currentSpacingLinear / baseLinear;
 
-// prefer the actual on-screen viewer width (so pageWidth tracks container), fallback to base pageWidth
-const viewerEl = document.getElementById('viewer');
-const viewerWidth = (viewerEl && viewerEl.clientWidth) ? viewerEl.clientWidth : baseOptions.pageWidth;
-
-// target width: let spacing drive growth, give an extra breathing multiplier
-const breathing = 1.5;
-const targetWidth = Math.max(viewerWidth, Math.round(baseOptions.pageWidth * Math.max(1, scaleFactor * breathing)));
-
-// safety cap so we don't explode memory or produce insanely large SVGs
-const MAX_PAGE_WIDTH = 20000;
-const pageWidth = Math.min(targetWidth, MAX_PAGE_WIDTH);
+// give Verovio more horizontal room as spacing grows
+const pageWidth =
+  Math.round(baseOptions.pageWidth * Math.max(1, scaleFactor * 1.5));
 
 const options = {
   ...baseOptions,
@@ -1020,9 +1009,6 @@ const options = {
   pageWidth
 };
 
-};
-
-      };
 
            // Choose a suitable transpose option for Verovio.
       // If we know the original key (originalKeyIndex), request transposition by target tonic (keeps key-based spellings).
@@ -1439,6 +1425,7 @@ const options = {
   </script>
 </body>
 </html>
+
 
 
 
