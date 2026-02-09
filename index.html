@@ -367,10 +367,10 @@
       return out;
     }
 
-    /* simple random loader (reads tunes/list.json) */
+    /* simple random loader (reads tunes.json) */
     async function loadRandomTuneToHumData() {
       try {
-        const listResp = await fetch('tunes/list.json?_=' + Date.now(), { cache: 'no-cache' });
+        const listResp = await fetch('tunes.json?_=' + Date.now(), { cache: 'no-cache' });
         if (!listResp || !listResp.ok) return null;
         const listJson = await listResp.json();
         const files = Array.isArray(listJson.files) ? listJson.files : [];
@@ -400,7 +400,7 @@
           : (filename || '—');
         document.getElementById('titleValue').textContent = pillText || (filename || '—');
       } else {
-        document.getElementById('titleValue').textContent = '— (no tunes/list.json)';
+        document.getElementById('titleValue').textContent = '— (no tunes.json)';
       }
     } catch (e) { console.warn(e); }
 
@@ -1032,7 +1032,7 @@
     }
 
     async function pickRandomTuneAndTranspose() {
-      const listResp = await fetch('tunes/list.json?_=' + Date.now(), { cache: 'no-cache' });
+      const listResp = await fetch('tunes.json?_=' + Date.now(), { cache: 'no-cache' });
       if (!listResp || !listResp.ok) return null;
       const listJson = await listResp.json();
       const files = Array.isArray(listJson.files) ? listJson.files : [];
@@ -1182,3 +1182,4 @@
   </script>
 </body>
 </html>
+
