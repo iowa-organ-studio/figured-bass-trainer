@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer1</title>
+<title>Figured Bass Trainer2</title>
 
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
@@ -988,11 +988,27 @@ vrvToolkit.setOptions(baseOptions);
       ].join('\n\n');
       if (humPanelEl) humPanelEl.textContent = panelContent;
 
-      const options = {
-        ...baseOptions,
-        scale: currentScale,
-        spacingLinear: currentSpacingLinear,
-        spacingNonLinear: currentSpacingLinear * (baseOptions.spacingNonLinear / baseOptions.spacingLinear)
+      // --- compute options with spacing-aware pageWidth to avoid heavy justification compression
+const scaleFactor = (baseOptions.spacingLinear && baseOptions.spacingLinear > 0)
+  ? (currentSpacingLinear / baseOptions.spacingLinear)
+  : 1;
+
+// Keep spacingNonLinear proportional to linear spacing (preserve your previous ratio)
+const spacingNonLinearRatio = (baseOptions.spacingNonLinear && baseOptions.spacingLinear)
+  ? (baseOptions.spacingNonLinear / baseOptions.spacingLinear)
+  : 1;
+
+const options = {
+  ...baseOptions,
+  scale: currentScale,
+  spacingLinear: currentSpacingLinear,
+  spacingNonLinear: currentSpacingLinear * spacingNonLinearRatio,
+  // Increase pageWidth as spacing grows so Verovio has room to draw without compressing.
+  // The multiplier (1.5) gives some breathing room; tweak as you like.
+  pageWidth: Math.max(baseOptions.pageWidth,
+                      Math.round(baseOptions.pageWidth * Math.max(1, scaleFactor * 1.5)))
+};
+
       };
 
            // Choose a suitable transpose option for Verovio.
@@ -1410,6 +1426,7 @@ vrvToolkit.setOptions(baseOptions);
   </script>
 </body>
 </html>
+
 
 
 
