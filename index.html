@@ -1122,7 +1122,7 @@
     }
 
     async function pickRandomTuneAndTranspose() {
-      const listResp = await fetch('/tunes/.json?_=' + Date.now(), { cache: 'no-cache' });
+      const listResp = await fetch('/tunes.json?_=' + Date.now(), { cache: 'no-cache' });
       if (!listResp || !listResp.ok) return null;
       const listJson = await listResp.json();
       const files = Array.isArray(listJson.files) ? listJson.files : [];
@@ -1313,4 +1313,5 @@
   </script>
 </body>
 </html>
+
 
