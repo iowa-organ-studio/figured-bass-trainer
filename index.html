@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer5</title>
+<title>Figured Bass Trainer6</title>
 
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
@@ -976,6 +976,25 @@ vrvToolkit.setOptions(baseOptions);
       // Always run the preparation pass so 4th spine can override even with 0 transpose
       const preparedHum = prepareFiguredBassForTranspose(humData || "", currentSemitones);
 
+// compute a human-readable display tonic + mode for the debug tag
+let displayKeyTag = 'unknown';
+if (originalKeyIndex !== null) {
+  const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
+  const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
+  const tonicReadable = tonicDisplayWithGlyphs(tonicRaw || '');
+  const modeText = originalIsMajor ? 'major' : 'minor';
+  displayKeyTag = tonicReadable + ' ' + modeText;
+} else {
+  // when originalKeyIndex unknown, show semitone/or octave
+  const totalSem = currentSemitones + (octaveShift * 12);
+  displayKeyTag = (totalSem === 0 && octaveShift === 0) ? 'original' : ('transposed ' + String(totalSem) + ' st');
+}
+
+// Prefix prepared humdrum with an informational !! comment that shows the display key
+// (Using !! preserves it as a global comment in Humdrum-style meta lines.)
+const preparedHumWithTag = '!!APPKEY: ' + displayKeyTag + '\\n' + (preparedHum || '');
+
+
       const semText = String(currentSemitones || 0);
       const actualAccLine = '##Actual Accidentals=' + (conventionsMode === 'modern' ? 'TRUE' : 'FALSE');
       const panelContent = [
@@ -984,7 +1003,7 @@ vrvToolkit.setOptions(baseOptions);
         '##currently displayed humdrum##',
         '##transpose ' + semText + ' semitones',
         actualAccLine,
-        preparedHum || '(empty)'
+        preparedHumWithTag || '(empty)'
       ].join('\n\n');
       if (humPanelEl) humPanelEl.textContent = panelContent;
 
@@ -1057,7 +1076,7 @@ const options = {
 
       vrvToolkit.setOptions(options);
       try {
-        const svg = vrvToolkit.renderData(preparedHum, {});
+        const svg = vrvToolkit.renderData(preparedHumWithTag, {});
         document.getElementById('svg').innerHTML = svg;
         document.getElementById('scaleBadge').textContent = String(currentScale);
         document.getElementById('spacingBadge').textContent = currentSpacingLinear.toFixed(2);
@@ -1229,7 +1248,6 @@ const options = {
     }
 // Return true if this pitch-class index has at least one MAJOR spelling
 // with <= 7 accidentals. Blocks theoretical major keys like G# major, A# major.
-// Helper: ensure an index can be a practical MAJOR key (some spelling <= 7 accidentals)
 function isMajorKeyAllowedForIndex(idx) {
   const cand = SAFE_TONICS_MAJOR[idx] || [];
   for (const n of cand) {
@@ -1241,11 +1259,14 @@ function isMajorKeyAllowedForIndex(idx) {
   return false;
 }
 
+
 async function pickRandomTuneAndTranspose() {
   const tunesJsonPath = buildRelativeForAsset('tunes.json?_=' + Date.now());
+  console.log('[pickRandomTuneAndTranspose] request tunes.json ->', tunesJsonPath);
   let listResp;
   try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); }
   catch (e) { console.error('[pickRandomTuneAndTranspose] fetch failed', e); return null; }
+
   if (!listResp || !listResp.ok) {
     console.warn('[pickRandomTuneAndTranspose] tunes.json not available', listResp && listResp.status);
     return null;
@@ -1289,7 +1310,7 @@ async function pickRandomTuneAndTranspose() {
 
   const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
 
-  // Make sure buckets are numeric (defensive)
+  // Normalize accidental buckets to numbers
   const accidentalSet = new Set(Array.from(accidentalsSelected).map(x => Number(x)).filter(n => !Number.isNaN(n)));
   const excluded = getExcludedTonicsSet();
   const possibleTargets = [];
@@ -1301,6 +1322,7 @@ async function pickRandomTuneAndTranspose() {
       continue;
     }
 
+    // nameInfos are spellings of the tonic index
     const names = SAFE_TONICS_MAJOR[idx] || [];
     const nameInfos = names.map(n => {
       const norm = tonicNameNormalized(n);
@@ -1308,15 +1330,14 @@ async function pickRandomTuneAndTranspose() {
       return { raw: n, norm, cnt };
     });
 
-    // Determine which signature-counts to check: major vs relative-minor mapping
-    const countsMajor = countsForIndexCandidates(idx);
-    const countsMinor = countsForIndexCandidates((idx + 3) % 12);
+    // counts for major-mode display and for minor-mode display (relative major)
+    const countsMajor = countsForIndexCandidates(idx);                // signatures for idx as MAJOR
+    const countsMinor = countsForIndexCandidates((idx + 3) % 12);    // signatures for idx as MINOR (via relative major)
 
-    // If user wants to preserve mode of source, check appropriate bucket — but even if not,
-    // we'll still enforce accidentalSet matching later on the validSpellings.
+    // If user has specific buckets, require a match for the mode we will display.
+    // We display in the same mode as the source tune (preserve mode), so pick which counts to check.
     const countsToCheck = sourcePick.original.isMajor ? countsMajor : countsMinor;
 
-    // If the user has ticked specific accidental buckets, require the index to expose one of those counts
     if (accidentalSet.size > 0) {
       const hasBucketMatch = countsToCheck.some(c => accidentalSet.has(Number(c)));
       if (!hasBucketMatch) {
@@ -1325,30 +1346,21 @@ async function pickRandomTuneAndTranspose() {
       }
     }
 
-    // Exclude tonics explicitly excluded by user
+    // exclude explicitly excluded tonic spellings
     const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
     if (anyExcluded) {
       console.debug('[pick] idx', idx, 'excluded by user:', nameInfos.map(n=>n.norm));
       continue;
     }
 
-    // Only keep spellings that are non-theoretical (<=7)
+    // Ensure there exists at least one non-theoretical spelling (<=7) for the tonic (for display flexibility)
     const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
     if (!validSpellings.length) {
       console.debug('[pick] idx', idx, 'no non-theoretical spellings', nameInfos);
       continue;
     }
 
-    // If user bucketed, at least one valid spelling must match a bucket
-    if (accidentalSet.size > 0) {
-      const matchesBucket = validSpellings.some(n => accidentalSet.has(Number(n.cnt)));
-      if (!matchesBucket) {
-        console.debug('[pick] idx', idx, 'valid spellings but none match bucket', validSpellings.map(v=>v.raw));
-        continue;
-      }
-    }
-
-    possibleTargets.push({ idx, validSpellings });
+    possibleTargets.push({ idx, nameInfos, countsMajor, countsMinor, validSpellings });
   }
 
   // fallback: relax bucket constraint but still respect theoretical-major guard & exclusions
@@ -1364,45 +1376,52 @@ async function pickRandomTuneAndTranspose() {
       if (anyExcluded) continue;
       const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
       if (!validSpellings.length) continue;
-      possibleTargets.push({ idx, validSpellings });
+      possibleTargets.push({ idx, nameInfos, countsMajor: countsForIndexCandidates(idx), countsMinor: countsForIndexCandidates((idx + 3) % 12), validSpellings });
     }
   }
 
   if (!possibleTargets.length) return null;
 
-  // pick random valid candidate
   const chosen = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
 
-  // Compute semitones (range -6..+6 preferred)
   const srcIdx = (typeof sourcePick.original.index === 'number') ? sourcePick.original.index : 0;
   let semitonesRaw = ((chosen.idx - srcIdx) + 120) % 12;
   let sem = semitonesRaw;
   if (sem > 6) sem = sem - 12;
 
-  // Prefer a display name that matches user's bucket if possible; fall back to pickDisplayName helper
+  // Select display name that is most appropriate for the mode:
   let displayName = null;
-  const preferredCounts = accidentalSet;
-  const validSpellings = (chosen.validSpellings || []).filter(s => s.cnt !== null && s.cnt <= 7);
-
-  if (preferredCounts.size > 0) {
-    const pref = validSpellings.filter(s => preferredCounts.has(Number(s.cnt))).map(s => s.raw);
-    if (pref.length) displayName = pref[Math.floor(Math.random() * pref.length)];
+  if (sourcePick.original.isMajor) {
+    // prefer a tonic spelling whose accidental-count matches the accidentalSet, else use helper
+    if (accidentalSet.size > 0) {
+      const pref = chosen.nameInfos.filter(n => n.cnt !== null && accidentalSet.has(Number(n.cnt))).map(n => n.raw);
+      if (pref.length) displayName = pref[Math.floor(Math.random() * pref.length)];
+    }
+    if (!displayName) displayName = pickDisplayNameForIndexByAccCount(chosen.idx, accidentalSet);
+  } else {
+    // for minor display, prefer spellings whose RELATIVE-MAJOR signature matches the bucket
+    // countsMinor holds the signature counts for the relative major of this minor tonic
+    if (accidentalSet.size > 0) {
+      if (chosen.countsMinor.some(c => accidentalSet.has(Number(c)))) {
+        // try to pick a tonic spelling that's non-theoretical; prefer first validSpellings
+        if (chosen.validSpellings && chosen.validSpellings.length) displayName = chosen.validSpellings[0].raw;
+      }
+    }
+    if (!displayName) {
+      // fallback: use a safe canonical tonic display
+      displayName = indexToTonic(chosen.idx, '');
+    }
   }
-  if (!displayName) {
-    // last resort: use the safer pickDisplayNameForIndexByAccCount (it too prefers <=7)
-    displayName = pickDisplayNameForIndexByAccCount(chosen.idx, preferredCounts);
-  }
 
-  // Extra sanity: if the chosen displayName's accidental count doesn't match the bucket (when bucket non-empty),
-  // try to find an alternate spelling. If none fits, log and continue with the safer name (we filtered earlier so this is unlikely)
+  // Sanity: ensure displayName's signature fits the bucket if bucket present (log if mismatch)
   if (accidentalSet.size > 0) {
     const dnNorm = tonicNameNormalized(displayName);
     const dnCnt = (dnNorm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[dnNorm] : null;
-    if (dnCnt === null || !accidentalSet.has(Number(dnCnt))) {
-      // try to find alternate
-      const alt = (validSpellings || []).find(s => accidentalSet.has(Number(s.cnt)));
-      if (alt) displayName = alt.raw;
-      else console.debug('[pick] displayName did not match bucket but no alternate found for idx', chosen.idx, 'displayName', displayName);
+    const signatureCountsForDisplayMode = sourcePick.original.isMajor ? chosen.countsMajor : chosen.countsMinor;
+    const matches = signatureCountsForDisplayMode.some(c => accidentalSet.has(Number(c)));
+    if (!matches) {
+      console.debug('[pick] chosen displayName signature did not match bucket; chosen.idx=', chosen.idx, 'displayName=', displayName, 'sigCounts=', signatureCountsForDisplayMode);
+      // still return it — we've already filtered indices above — but log so we can iterate if more strictness desired
     }
   }
 
@@ -1495,6 +1514,7 @@ async function pickRandomTuneAndTranspose() {
   </script>
 </body>
 </html>
+
 
 
 
