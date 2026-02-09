@@ -452,19 +452,23 @@
     } catch (e) { console.warn(e); }
 
     /* -------------------- verovio & base options -------------------- */
-    if (!(window.verovio && typeof verovio.toolkit === 'function')) {
-      document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths: verovio-toolkit-wasm.js and verovio-toolkit-hum.js';
-      document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)');
-      return;
-    }
+if (!(window.verovio && typeof verovio.toolkit === 'function')) {
+  document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths: verovio-toolkit-wasm.js and verovio-toolkit-hum.js';
+  document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)');
+  return;
+}
 
-    const baseOptions = {
+// instantiate verovio toolkit
+const vrvToolkit = new verovio.toolkit();
+
+const baseOptions = {
   scale: 50, pageWidth: 900, adjustPageHeight: true,
   spacingLinear: 0.50,
   spacingNonLinear: 0.50 * (0.46 / 0.32), // preserve ratio
   spacingSystem: 10, spacingStaff: 8
 };
-    vrvToolkit.setOptions(baseOptions);
+vrvToolkit.setOptions(baseOptions);
+
 
     /* -------------------- state -------------------- */
     let figuresAbove = false;
@@ -1380,5 +1384,6 @@
   </script>
 </body>
 </html>
+
 
 
