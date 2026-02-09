@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Figured Bass Trainer7</title>
+  <title>Figured Bass Trainer8</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
@@ -450,6 +450,26 @@
       return;
     }
 
+// --- create a Verovio toolkit instance (robust instantiation) ---
+let vrvToolkit = null;
+try {
+  // preferred API: verovio.toolkit() returns an instance in some builds
+  if (typeof verovio.toolkit === 'function') {
+    vrvToolkit = verovio.toolkit();
+  } else if (typeof verovio.Toolkit === 'function') {
+    // alternative constructor name used in some builds
+    vrvToolkit = new verovio.Toolkit();
+  } else {
+    throw new Error('No verovio constructor available');
+  }
+} catch (err) {
+  console.error('Failed to instantiate Verovio toolkit:', err);
+  document.getElementById('svg').textContent = 'Verovio toolkit failed to instantiate. See console for details.';
+  // stop further execution: return from enclosing async function
+  return;
+}
+
+    
     // baseOptions (spacingLinear default preserved here)
     const baseOptions = {
       scale: 50, pageWidth: 900, adjustPageHeight: true,
@@ -1441,3 +1461,4 @@
   </script>
 </body>
 </html>
+
