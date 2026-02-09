@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Humdrum Viewer — Figured Bass Placement Restored (Letter-first fix)</title>
+<title>Figured Bass Trainer</title>
+
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
@@ -168,7 +169,7 @@
           </div>
         </div>
         <!-- max spacing increased to 0.50; default 0.32 -->
-        <input id="spacingSlider" type="range" min="0.20" max="0.50" step="0.01" value="0.32" />
+        <input id="spacingSlider" type="range" min="0.20" max="0.99" step="0.01" value="0.50" />
       </div>
     </div>
 
@@ -457,12 +458,12 @@
       return;
     }
 
-    const vrvToolkit = new verovio.toolkit();
     const baseOptions = {
-      scale: 50, pageWidth: 900, adjustPageHeight: true,
-      spacingLinear: 0.32, spacingNonLinear: 0.46,
-      spacingSystem: 10, spacingStaff: 8
-    };
+  scale: 50, pageWidth: 900, adjustPageHeight: true,
+  spacingLinear: 0.50,
+  spacingNonLinear: 0.50 * (0.46 / 0.32), // preserve ratio
+  spacingSystem: 10, spacingStaff: 8
+};
     vrvToolkit.setOptions(baseOptions);
 
     /* -------------------- state -------------------- */
@@ -1033,12 +1034,12 @@
 
     document.getElementById('musicPlusBtn').addEventListener('click', () => { currentScale = clamp(currentScale + 2, 30, 200); renderWithTranspose(); });
     document.getElementById('musicMinusBtn').addEventListener('click', () => { currentScale = clamp(currentScale - 2, 30, 200); renderWithTranspose(); });
-    document.getElementById('spacingPlusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear + 0.01, 0.20, 0.50); renderWithTranspose(); });
-    document.getElementById('spacingMinusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear - 0.01, 0.20, 0.50); renderWithTranspose(); });
+    document.getElementById('spacingPlusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear + 0.01, 0.20, 0.99); renderWithTranspose(); });
+    document.getElementById('spacingMinusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear - 0.01, 0.20, 0.99); renderWithTranspose(); });
     document.getElementById('scaleResetBtn').addEventListener('click', ()=>{ currentScale = baseOptions.scale; renderWithTranspose(); });
     document.getElementById('spacingResetBtn').addEventListener('click', ()=>{ currentSpacingLinear = baseOptions.spacingLinear; renderWithTranspose(); });
     document.getElementById('scaleSlider').addEventListener('input', (e)=>{ currentScale = clamp(Number(e.target.value),30,200); renderWithTranspose(); });
-    document.getElementById('spacingSlider').addEventListener('input', (e)=>{ currentSpacingLinear = clamp(Number(e.target.value),0.20,0.50); renderWithTranspose(); });
+    document.getElementById('spacingSlider').addEventListener('input', (e)=>{ currentSpacingLinear = clamp(Number(e.target.value),0.20,0.99); renderWithTranspose(); });
 
     // Accidentals radios
     const convHist = document.getElementById('conv_historic');
@@ -1379,4 +1380,5 @@
   </script>
 </body>
 </html>
+
 
