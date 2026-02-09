@@ -352,23 +352,24 @@
     }
 
     /* -------------------- safe random loader -------------------- */
-    async function loadRandomTuneToHumData() {
+        async function loadRandomTuneToHumData() {
       try {
-        const listResp = await fetch('/tunes.json?_=' + Date.now(), { cache: 'no-cache' });
-        if (!listResp || !listResp.ok) return null;
-        const listJson = await listResp.json();
-        const files = Array.isArray(listJson.files) ? listJson.files : [];
-        if (files.length === 0) return null;
-        const pick = files[Math.floor(Math.random() * files.length)];
-        const fileResp = await fetch('/tunes/' + encodeURIComponent(pick));
-        if (!fileResp || !fileResp.ok) return null;
-        const text = await fileResp.text();
-        return { filename: pick, text };
-      } catch (e) {
-        console.error('loadRandomTuneToHumData error', e);
-        return null;
-      }
-    }
+          const listResp = await fetch('tunes.json?_=' + Date.now(), { cache: 'no-cache' });
+         if (!listResp || !listResp.ok) return null;
+         const listJson = await listResp.json();
+         const files = Array.isArray(listJson.files) ? listJson.files : [];
+         if (files.length === 0) return null;
+         const pick = files[Math.floor(Math.random() * files.length)];
+        const fileResp = await fetch('tunes/' + encodeURIComponent(pick));
+         if (!fileResp || !fileResp.ok) return null;
+         const text = await fileResp.text();
+         return { filename: pick, text };
+       } catch (e) {
+         console.error('loadRandomTuneToHumData error', e);
+         return null;
+       }
+     }
+
 
     /* -------------------- initial file load -------------------- */
     let humData = "";
@@ -1122,12 +1123,13 @@
     }
 
     async function pickRandomTuneAndTranspose() {
-      const listResp = await fetch('/tunes.json?_=' + Date.now(), { cache: 'no-cache' });
-      if (!listResp || !listResp.ok) return null;
-      const listJson = await listResp.json();
-      const files = Array.isArray(listJson.files) ? listJson.files : [];
-      if (!files.length) return null;
-      const excludedSet = getExcludedTonicsSet();
+     const listResp = await fetch('tunes.json?_=' + Date.now(), { cache: 'no-cache' });
+       if (!listResp || !listResp.ok) return null;
+       const listJson = await listResp.json();
+       const files = Array.isArray(listJson.files) ? listJson.files : [];
+       if (!files.length) return null;
+       const excludedSet = getExcludedTonicsSet();
+
 
       const candidates = [];
       for (const f of files) {
@@ -1313,5 +1315,6 @@
   </script>
 </body>
 </html>
+
 
 
