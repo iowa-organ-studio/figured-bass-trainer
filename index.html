@@ -6,6 +6,7 @@
   <title>Humdrum Viewer — Figured Bass Placement Restored (Letter-first fix)</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
   <script src="verovio-toolkit-wasm.js"></script>
   <script src="verovio-toolkit-hum.js"></script>
 
@@ -351,25 +352,84 @@
       return out;
     }
 
-    /* -------------------- safe random loader -------------------- */
-        async function loadRandomTuneToHumData() {
-      try {
-          const listResp = await fetch('tunes.json?_=' + Date.now(), { cache: 'no-cache' });
-         if (!listResp || !listResp.ok) return null;
-         const listJson = await listResp.json();
-         const files = Array.isArray(listJson.files) ? listJson.files : [];
-         if (files.length === 0) return null;
-         const pick = files[Math.floor(Math.random() * files.length)];
-        const fileResp = await fetch('tunes/' + encodeURIComponent(pick));
-         if (!fileResp || !fileResp.ok) return null;
-         const text = await fileResp.text();
-         return { filename: pick, text };
-       } catch (e) {
-         console.error('loadRandomTuneToHumData error', e);
-         return null;
-       }
-     }
+    /* -------------------- robust asset helpers -------------------- */
+    // Build a relative path that works for GitHub Pages (keeps repo base path)
+    function normalizeTunePath(entry) {
+      if (!entry) return '';
+      let e = String(entry);
+      e = e.replace(/^"+|"+$/g,''); // trim stray quotes if any
+      e = e.replace(/^\/+/, ''); // drop leading slash
+      // If tune.json entries use 'tunes/...' already, keep it, otherwise prepend 'tunes/'
+      if (!/^tunes\//i.test(e) && !/^tunes\.json$/i.test(e)) e = 'tunes/' + e;
+      return e;
+    }
 
+    function buildRelativeForAsset(pathSegment) {
+      // compute directory of current document (keeps repo path for GitHub Pages)
+      const baseDir = (window.location.pathname.endsWith('/'))
+        ? window.location.pathname
+        : window.location.pathname.replace(/\/[^/]*$/, '/');
+      // join and dedupe slashes, but leave leading slash (so browser will request same origin + path)
+      // We purposely avoid a domain (origin) so fetch uses same origin, same branch root
+      let p = baseDir + pathSegment;
+      p = p.replace(/\/{2,}/g, '/');
+      // If the site is hosted at domain root, leading slash is fine; if hosted under /repo/, baseDir includes /repo/
+      return p;
+    }
+
+    // fetch helper: logs and uses encodeURI (so slashes remain)
+    async function fetchAsset(entry) {
+      const rel = normalizeTunePath(entry);
+      const urlPath = buildRelativeForAsset(rel);
+      console.log('[fetchAsset] trying', { entry, rel, urlPath });
+      try {
+        const resp = await fetch(encodeURI(urlPath), { cache: 'no-cache' });
+        if (!resp || !resp.ok) {
+          console.warn('[fetchAsset] fetch failed', resp && resp.status, urlPath);
+          return null;
+        }
+        return resp;
+      } catch (e) {
+        console.error('[fetchAsset] error', e, urlPath);
+        return null;
+      }
+    }
+
+    /* -------------------- safe random loader (robust) -------------------- */
+    async function loadRandomTuneToHumData() {
+      try {
+        const tunesJsonPath = buildRelativeForAsset('tunes.json?_=' + Date.now());
+        console.log('[loadRandomTuneToHumData] requesting', tunesJsonPath);
+        let listResp;
+        try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); }
+        catch (e) { console.error('[loadRandomTuneToHumData] fetch failed', e); return null; }
+        if (!listResp || !listResp.ok) {
+          console.warn('[loadRandomTuneToHumData] tunes.json missing', listResp && listResp.status);
+          return null;
+        }
+        const listJson = await listResp.json();
+        console.log('[loadRandomTuneToHumData] tunes.json content', listJson);
+
+        let files = [];
+        if (Array.isArray(listJson)) files = listJson.slice();
+        else if (Array.isArray(listJson.files)) files = listJson.files.slice();
+        else {
+          console.warn('[loadRandomTuneToHumData] tunes.json has unexpected shape');
+          return null;
+        }
+        if (!files.length) { console.warn('[loadRandomTuneToHumData] tunes.json empty'); return null; }
+        const pick = files[Math.floor(Math.random() * files.length)];
+        console.log('[loadRandomTuneToHumData] picked', pick);
+
+        const fileResp = await fetchAsset(pick);
+        if (!fileResp) { console.warn('[loadRandomTuneToHumData] file fetch failed'); return null; }
+        const text = await fileResp.text();
+        return { filename: pick, text };
+      } catch (e) {
+        console.error('[loadRandomTuneToHumData] unexpected error', e);
+        return null;
+      }
+    }
 
     /* -------------------- initial file load -------------------- */
     let humData = "";
@@ -1123,130 +1183,130 @@
     }
 
     async function pickRandomTuneAndTranspose() {
-     const listResp = await fetch('tunes.json?_=' + Date.now(), { cache: 'no-cache' });
-       if (!listResp || !listResp.ok) return null;
+     const tunesJsonPath = buildRelativeForAsset('tunes.json?_=' + Date.now());
+     console.log('[pickRandomTuneAndTranspose] request tunes.json ->', tunesJsonPath);
+     let listResp;
+     try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); }
+     catch (e) { console.error('[pickRandomTuneAndTranspose] fetch failed', e); return null; }
+
+       if (!listResp || !listResp.ok) {
+         console.warn('[pickRandomTuneAndTranspose] tunes.json not available', listResp && listResp.status);
+         return null;
+       }
+
        const listJson = await listResp.json();
-       const files = Array.isArray(listJson.files) ? listJson.files : [];
-       if (!files.length) return null;
-       const excludedSet = getExcludedTonicsSet();
+       console.log('[pickRandomTuneAndTranspose] tunes.json content', listJson);
+       const files = Array.isArray(listJson) ? listJson.slice() : (Array.isArray(listJson.files) ? listJson.files.slice() : []);
+       if (!files.length) { console.warn('[pickRandomTuneAndTranspose] no files listed'); return null; }
 
+       const candidates = [];
+       for (const f of files) {
+         try {
+           const fr = await fetchAsset(f);
+           if (!fr || !fr.ok) { console.warn('[pickRandomTuneAndTranspose] skipping missing', f); continue; }
+           const text = await fr.text();
+           const meta = extractSecondSpineMeta(text || '');
+           const dir = (meta.dir || '').toLowerCase();
 
-      const candidates = [];
-      for (const f of files) {
-        try {
-          const fr = await fetch('/tunes/' + encodeURIComponent(f));
-          if (!fr || !fr.ok) continue;
-          const text = await fr.text();
-          const meta = extractSecondSpineMeta(text || '');
-          const dir = (meta.dir || '').toLowerCase();
+           const isAsc = /\bascend/.test(dir);
+           const isDesc = /\bdescend/.test(dir);
 
-          // Treat values like "Descending Minor" or "Ascending (etc.)" as descending/ascending
-          const isAsc = /\bascend/.test(dir);
-          const isDesc = /\bdescend/.test(dir);
+           if (!filterAscending && isAsc) continue;
+           if (!filterDescending && isDesc) continue;
 
-          if (!filterAscending && isAsc) continue;
-          if (!filterDescending && isDesc) continue;
+           const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
+           if (!isNaN(num) && num > maxDifficulty) continue;
+           if (isNaN(num) && maxDifficulty < 7) continue;
 
-          const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
-          if (!isNaN(num) && num > maxDifficulty) continue;
-          if (isNaN(num) && maxDifficulty < 7) continue;
+           const k = parseKeyInterpretation(text || '');
+           if (!k) continue;
+           const idx = keyToIndex(k.letter, k.accidental);
+           const isMajor = (k.letter === k.letter.toUpperCase());
+           if (!filterMajor && isMajor) continue;
+           if (!filterMinor && !isMajor) continue;
 
-          const k = parseKeyInterpretation(text || '');
-          if (!k) continue;
-          const idx = keyToIndex(k.letter, k.accidental);
-          const isMajor = (k.letter === k.letter.toUpperCase());
-          if (!filterMajor && isMajor) continue;
-          if (!filterMinor && !isMajor) continue;
+           candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: indexToTonic(idx, '') }, meta });
+         } catch (e) { /* ignore single failures */ console.warn('[pickRandomTuneAndTranspose] error reading', f, e); }
+       }
 
-          candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: indexToTonic(idx, '') }, meta });
-        } catch (e) { /* ignore single failures */ }
-      }
+       console.log('[pickRandomTuneAndTranspose] candidates count', candidates.length);
+       if (!candidates.length) return null;
 
-      if (!candidates.length) return null;
+       const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
 
-      const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
+       // Determine allowed target indices based on selected accidental-count buckets and mode
+       const accidentalSet = new Set(Array.from(accidentalsSelected)); // e.g. {7}
+       const excluded = getExcludedTonicsSet();
+       const possibleTargets = [];
 
-      // Determine allowed target indices based on selected accidental-count buckets and mode
-      const accidentalSet = new Set(Array.from(accidentalsSelected)); // e.g. {7}
-      const excluded = getExcludedTonicsSet();
-      const possibleTargets = [];
+       for (let idx = 0; idx < 12; idx++) {
+         const names = SAFE_TONICS_MAJOR[idx] || [];
 
-      for (let idx = 0; idx < 12; idx++) {
-        const names = SAFE_TONICS_MAJOR[idx] || [];
+         const nameInfos = names.map(n => {
+           const norm = tonicNameNormalized(n);
+           const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+           return { raw: n, norm, cnt };
+         });
 
-        // compute counts for this index for both available spellings
-        const nameInfos = names.map(n => {
-          const norm = tonicNameNormalized(n);
-          const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
-          return { raw: n, norm, cnt };
-        });
+         const countsMajor = countsForIndexCandidates(idx);
+         const countsMinor = countsForIndexCandidates((idx + 3) % 12);
 
-        // if source is major we compare to major counts, else to relative-major-of-minor counts (keep previous logic)
-        const countsMajor = countsForIndexCandidates(idx);
-        const countsMinor = countsForIndexCandidates((idx + 3) % 12);
+         if (sourcePick.original.isMajor) {
+           const anyMatch = countsMajor.some(c => accidentalSet.has(c));
+           if (!anyMatch) continue;
+         } else {
+           const anyMatch = countsMinor.some(c => accidentalSet.has(c));
+           if (!anyMatch) continue;
+         }
 
-        if (sourcePick.original.isMajor) {
-          const anyMatch = countsMajor.some(c => accidentalSet.has(c));
-          if (!anyMatch) continue;
-        } else {
-          const anyMatch = countsMinor.some(c => accidentalSet.has(c));
-          if (!anyMatch) continue;
-        }
+         const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
+         if (anyExcluded) continue;
 
-        // exclude indices where every spelling is excluded by the 'Exclude' list
-        const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
-        if (anyExcluded) continue;
+         const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
+         if (!validSpellings.length) continue; // all theoretical >7
 
-        // Now ensure this index actually has at least one spelling that:
-        //  - has a known accidental-count
-        //  - its accidental-count <= 7 (no theoretical >7)
-        //  - and (preferably) matches one of the selected accidental buckets
-        const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
-        if (!validSpellings.length) continue; // all theoretical >7
+         if (accidentalSet.size > 0) {
+           const matchesBucket = validSpellings.some(n => accidentalSet.has(n.cnt));
+           if (!matchesBucket) continue; // index doesn't provide any spelling in the selected bucket
+         }
 
-        if (accidentalSet.size > 0) {
-          const matchesBucket = validSpellings.some(n => accidentalSet.has(n.cnt));
-          if (!matchesBucket) continue; // index doesn't provide any spelling in the selected bucket
-        }
+         possibleTargets.push({ idx, names });
+       }
 
-        possibleTargets.push({ idx, names });
-      }
+       if (!possibleTargets.length) {
+         for (let idx = 0; idx < 12; idx++) {
+           const names = SAFE_TONICS_MAJOR[idx] || [];
+           const nameInfos = names.map(n => {
+             const norm = tonicNameNormalized(n);
+             const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+             return { raw: n, norm, cnt };
+           });
+           const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
+           if (anyExcluded) continue;
+           const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
+           if (!validSpellings.length) continue;
+           possibleTargets.push({ idx, names });
+         }
+       }
 
-      // Fallback: if still empty, allow indices with any non-theoretical spelling (<=7) ignoring the bucket-match
-      if (!possibleTargets.length) {
-        for (let idx = 0; idx < 12; idx++) {
-          const names = SAFE_TONICS_MAJOR[idx] || [];
-          const nameInfos = names.map(n => {
-            const norm = tonicNameNormalized(n);
-            const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
-            return { raw: n, norm, cnt };
-          });
-          const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
-          if (anyExcluded) continue;
-          const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
-          if (!validSpellings.length) continue;
-          possibleTargets.push({ idx, names });
-        }
-      }
+       if (!possibleTargets.length) return null;
 
-      if (!possibleTargets.length) return null;
+       const chosen = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
 
-      const chosen = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+       const srcIdx = (typeof sourcePick.original.index === 'number') ? sourcePick.original.index : 0;
+       let semitonesRaw = ((chosen.idx - srcIdx) + 120) % 12;
+       let sem = semitonesRaw;
+       if (sem > 6) sem = sem - 12;
 
-      const srcIdx = (typeof sourcePick.original.index === 'number') ? sourcePick.original.index : 0;
-      let semitonesRaw = ((chosen.idx - srcIdx) + 120) % 12;
-      let sem = semitonesRaw;
-      if (sem > 6) sem = sem - 12;
-
-      // choose display name from spellings that match the selected buckets if possible
-      const displayName = pickDisplayNameForIndexByAccCount(chosen.idx, accidentalSet);
-      return { filename: sourcePick.filename, text: sourcePick.text, semitones: sem, displayName: displayName, enharmList: SAFE_TONICS_MAJOR[chosen.idx] || [], meta: sourcePick.meta };
+       const displayName = pickDisplayNameForIndexByAccCount(chosen.idx, accidentalSet);
+       return { filename: sourcePick.filename, text: sourcePick.text, semitones: sem, displayName: displayName, enharmList: SAFE_TONICS_MAJOR[chosen.idx] || [], meta: sourcePick.meta };
     }
 
     /* -------------------- Random button wiring -------------------- */
     const rb = document.getElementById('randomBtn');
     if (rb) rb.addEventListener('click', async()=>{
       rb.disabled = true;
+      console.log('[randomBtn] clicked');
       try {
         const res = await pickRandomTuneAndTranspose();
         if (res) {
@@ -1273,6 +1333,8 @@
           displayTonicOverride = res.displayName || null;
           enharmonicCycleList = (res.enharmList && res.enharmList.length) ? res.enharmList.slice() : (originalKeyIndex !== null ? SAFE_TONICS_MAJOR[(originalKeyIndex+currentSemitones+120)%12] : []);
         } else {
+          console.warn('[randomBtn] no candidate found (res null)');
+          document.getElementById('titleValue').textContent = '— (no tunes found)';
           const r = await loadRandomTuneToHumData();
           if (r) {
             humData = r.text;
@@ -1281,7 +1343,6 @@
               ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
               : (r.filename || '—');
             document.getElementById('titleValue').textContent = pillText;
-
             const k = parseKeyInterpretation(humData||'');
             if (k) {
               originalKeyIndex = keyToIndex(k.letter, k.accidental);
@@ -1292,6 +1353,9 @@
             octaveShift = 0;
             displayTonicOverride = null;
             enharmonicCycleList = [];
+          } else {
+            console.warn('[randomBtn] fallback also failed — no tunes.json or files accessible');
+            document.getElementById('humPanel').textContent = 'No tunes found or cannot fetch files. See console for details.';
           }
         }
       } finally {
@@ -1315,6 +1379,3 @@
   </script>
 </body>
 </html>
-
-
-
