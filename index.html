@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer</title>
+<title>Figured Bass Trainer1</title>
 
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
@@ -995,13 +995,35 @@ vrvToolkit.setOptions(baseOptions);
         spacingNonLinear: currentSpacingLinear * (baseOptions.spacingNonLinear / baseOptions.spacingLinear)
       };
 
+           // Choose a suitable transpose option for Verovio.
+      // If we know the original key (originalKeyIndex), request transposition by target tonic (keeps key-based spellings).
+      // Otherwise request chromatic semitone transposition (integer), which works even if input lacks key info.
+      let transposeOption = "";
+      if (originalKeyIndex !== null) {
+        const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
+        const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
+        const prefix = octaveShift > 0 ? "+".repeat(octaveShift) : octaveShift < 0 ? "-".repeat(-octaveShift) : "";
+        // Example: "+Gb" or "C"
+        transposeOption = prefix + (tonicRaw || "");
+      } else {
+        // When no key info is available in the input, fall back to semitone transposition.
+        // Verovio accepts an integer string (e.g. "1", "-1") to mean chromatic semitone steps.
+        if (currentSemitones !== 0 || octaveShift !== 0) {
+          // include octaveShift as additional 12-semitone steps:
+          const totalSemitones = currentSemitones + (octaveShift * 12);
+          transposeOption = String(totalSemitones);
+        } else {
+          transposeOption = ""; // no transpose
+        }
+      }
+      options.transpose = transposeOption;
+
+      // Status text for the UI:
       if (originalKeyIndex !== null) {
         const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
         const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
         const tonic = tonicDisplayWithGlyphs(tonicRaw);
         const modeText = originalIsMajor ? ' major' : ' minor';
-        const prefix = octaveShift > 0 ? "+".repeat(octaveShift) : octaveShift < 0 ? "-".repeat(-octaveShift) : "";
-        options.transpose = prefix + (tonicRaw || "");
         if (octaveShift !== 0) {
           const octaveText = octaveShift > 0 ? " 8va↑ (" + String(octaveShift) + ")" : " 8va↓ (" + String(octaveShift) + ")";
           document.getElementById('statusKey').textContent = tonic + modeText + octaveText;
@@ -1009,10 +1031,14 @@ vrvToolkit.setOptions(baseOptions);
           document.getElementById('statusKey').textContent = tonic + modeText;
         }
       } else {
-        options.transpose = "";
-        if (currentSemitones === 0 && octaveShift === 0) document.getElementById('statusKey').textContent = "original";
-        else document.getElementById('statusKey').textContent = "transposed " + String(currentSemitones) + " st";
+        if (currentSemitones === 0 && octaveShift === 0) {
+          document.getElementById('statusKey').textContent = "original";
+        } else {
+          const totalSem = currentSemitones + (octaveShift * 12);
+          document.getElementById('statusKey').textContent = "transposed " + String(totalSem) + " st";
+        }
       }
+
 
       vrvToolkit.setOptions(options);
       try {
@@ -1384,6 +1410,7 @@ vrvToolkit.setOptions(baseOptions);
   </script>
 </body>
 </html>
+
 
 
 
