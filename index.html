@@ -354,13 +354,13 @@
     /* -------------------- safe random loader -------------------- */
     async function loadRandomTuneToHumData() {
       try {
-        const listResp = await fetch('tunes/list.json?_=' + Date.now(), { cache: 'no-cache' });
+        const listResp = await fetch('/tunes.json?_=' + Date.now(), { cache: 'no-cache' });
         if (!listResp || !listResp.ok) return null;
         const listJson = await listResp.json();
         const files = Array.isArray(listJson.files) ? listJson.files : [];
         if (files.length === 0) return null;
         const pick = files[Math.floor(Math.random() * files.length)];
-        const fileResp = await fetch('tunes/' + encodeURIComponent(pick));
+        const fileResp = await fetch('/tunes/' + encodeURIComponent(pick));
         if (!fileResp || !fileResp.ok) return null;
         const text = await fileResp.text();
         return { filename: pick, text };
@@ -1122,7 +1122,7 @@
     }
 
     async function pickRandomTuneAndTranspose() {
-      const listResp = await fetch('tunes/list.json?_=' + Date.now(), { cache: 'no-cache' });
+      const listResp = await fetch('/tunes/.json?_=' + Date.now(), { cache: 'no-cache' });
       if (!listResp || !listResp.ok) return null;
       const listJson = await listResp.json();
       const files = Array.isArray(listJson.files) ? listJson.files : [];
@@ -1132,7 +1132,7 @@
       const candidates = [];
       for (const f of files) {
         try {
-          const fr = await fetch('tunes/' + encodeURIComponent(f));
+          const fr = await fetch('/tunes/' + encodeURIComponent(f));
           if (!fr || !fr.ok) continue;
           const text = await fr.text();
           const meta = extractSecondSpineMeta(text || '');
@@ -1313,3 +1313,4 @@
   </script>
 </body>
 </html>
+
