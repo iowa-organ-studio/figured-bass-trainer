@@ -28,7 +28,7 @@ jobs:
           entries = []
           for dirpath, dirnames, filenames in os.walk(root):
               for fn in filenames:
-                  if fn.lower().endswith('.mei'):
+                  if fn.lower().endswith('.krn'):
                       rel = os.path.join(dirpath, fn).replace('\\','/')
                       entries.append(rel)
           entries.sort(key=lambda s: s.lower())
