@@ -100,6 +100,11 @@
       <span class="label">Key</span>
       <span id="statusKey" class="value">—</span>
     </span>
+
+    <!-- New filename status chip (no label) -->
+    <span class="chip" title="Source filename">
+      <span id="statusFilename" class="value">—</span>
+    </span>
   </div>
 
   <div id="viewerWrap">
@@ -384,8 +389,14 @@
           ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
           : (filename || '—');
         document.getElementById('titleValue').textContent = pillText || (filename || '—');
+
+        // update filename chip
+        const fnElInit = document.getElementById('statusFilename');
+        if (fnElInit) fnElInit.textContent = filename || '—';
       } else {
         document.getElementById('titleValue').textContent = '— (no tunes/list.json)';
+        const fnElInit = document.getElementById('statusFilename');
+        if (fnElInit) fnElInit.textContent = '—';
       }
     } catch (e) { console.warn(e); }
 
@@ -868,7 +879,7 @@
           if (actualTextIndex != null && c === actualTextIndex && String(toks[c]).startsWith('**text')) {
             toks[c] = '**text-hidden';
           }
-          if (forceTextIndex  != null && c === forceTextIndex  && String(toks[c]).startsWith('**text')) {
+          if (forceTextIndex  != null && c === forceTextIndex  and String(toks[c]).startsWith('**text')) {
             toks[c] = '**text-hidden';
           }
         }
@@ -1019,6 +1030,8 @@
     addAccidentalRangeButtons("keysRangeRowTop","keysRangeRowBottom");
     addExcludeCheckboxes("exRow", excludeTonics);
     document.getElementById('titleValue').textContent = filename || '—';
+    const fnElAfterSetup = document.getElementById('statusFilename');
+    if (fnElAfterSetup) fnElAfterSetup.textContent = filename || '—';
 
     /* -------------------- Asc/Desc, Major/Minor, Max difficulty -------------------- */
     const ascBtn = document.getElementById('filterAscBtn');
@@ -1232,6 +1245,11 @@
         const res = await pickRandomTuneAndTranspose();
         if (res) {
           humData = res.text;
+          // set filename and update chip
+          filename = res.filename;
+          const fnEl = document.getElementById('statusFilename');
+          if (fnEl) fnEl.textContent = filename || '—';
+
           const meta = extractSecondSpineMeta(humData);
           const pillText = (meta.dir || meta.title || meta.number)
             ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
@@ -1257,6 +1275,12 @@
           const r = await loadRandomTuneToHumData();
           if (r) {
             humData = r.text;
+
+            // set filename and update chip (fallback)
+            filename = r.filename;
+            const fnEl = document.getElementById('statusFilename');
+            if (fnEl) fnEl.textContent = filename || '—';
+
             const meta = extractSecondSpineMeta(humData);
             const pillText = (meta.dir || meta.title || meta.number)
               ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
