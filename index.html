@@ -100,11 +100,6 @@
       <span class="label">Key</span>
       <span id="statusKey" class="value">—</span>
     </span>
-
-    <!-- New filename status chip (no label) -->
-    <span class="chip" title="Source filename">
-      <span id="statusFilename" class="value">—</span>
-    </span>
   </div>
 
   <div id="viewerWrap">
@@ -386,17 +381,11 @@
         humData = initial.text;
         const meta = extractSecondSpineMeta(humData);
         const pillText = (meta.dir || meta.title || meta.number)
-          ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
+          ? ${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}.trim()
           : (filename || '—');
         document.getElementById('titleValue').textContent = pillText || (filename || '—');
-
-        // update filename chip
-        const fnElInit = document.getElementById('statusFilename');
-        if (fnElInit) fnElInit.textContent = filename || '—';
       } else {
         document.getElementById('titleValue').textContent = '— (no tunes/list.json)';
-        const fnElInit = document.getElementById('statusFilename');
-        if (fnElInit) fnElInit.textContent = '—';
       }
     } catch (e) { console.warn(e); }
 
@@ -879,7 +868,7 @@
           if (actualTextIndex != null && c === actualTextIndex && String(toks[c]).startsWith('**text')) {
             toks[c] = '**text-hidden';
           }
-          if (forceTextIndex  != null && c === forceTextIndex  and String(toks[c]).startsWith('**text')) {
+          if (forceTextIndex  != null && c === forceTextIndex  && String(toks[c]).startsWith('**text')) {
             toks[c] = '**text-hidden';
           }
         }
@@ -994,7 +983,7 @@
         const btn = document.createElement('button');
         btn.type='button';
         btn.className = 'range-btn' + (accidentalsSelected.has(n)?' active':'');
-        btn.textContent = `${n}#/${n}♭`;
+        btn.textContent = ${n}#/${n}♭;
         btn.addEventListener('click', ()=>{ if (accidentalsSelected.has(n)){ accidentalsSelected.delete(n); btn.classList.remove('active'); } else { accidentalsSelected.add(n); btn.classList.add('active'); } });
         (n<=3?top:bot).appendChild(btn);
         keyRangeButtons.set(n, btn);
@@ -1007,7 +996,7 @@
     function addExcludeCheckboxes(containerId, values){
       const row = document.getElementById(containerId);
       values.forEach(val=>{
-        const id = `${containerId}_${String(val).replace(/[^A-Za-z0-9]/g,'_')}`;
+        const id = ${containerId}_${String(val).replace(/[^A-Za-z0-9]/g,'_')};
         const label = document.createElement('label'); label.className = 'chk-label';
         const cb = document.createElement('input'); cb.type='checkbox'; cb.id = id; cb.value = val; cb.checked = false;
         const span = document.createElement('span'); span.textContent = val.replace(/#/g,"♯").replace(/b/g,"♭");
@@ -1030,8 +1019,6 @@
     addAccidentalRangeButtons("keysRangeRowTop","keysRangeRowBottom");
     addExcludeCheckboxes("exRow", excludeTonics);
     document.getElementById('titleValue').textContent = filename || '—';
-    const fnElAfterSetup = document.getElementById('statusFilename');
-    if (fnElAfterSetup) fnElAfterSetup.textContent = filename || '—';
 
     /* -------------------- Asc/Desc, Major/Minor, Max difficulty -------------------- */
     const ascBtn = document.getElementById('filterAscBtn');
@@ -1245,14 +1232,9 @@
         const res = await pickRandomTuneAndTranspose();
         if (res) {
           humData = res.text;
-          // set filename and update chip
-          filename = res.filename;
-          const fnEl = document.getElementById('statusFilename');
-          if (fnEl) fnEl.textContent = filename || '—';
-
           const meta = extractSecondSpineMeta(humData);
           const pillText = (meta.dir || meta.title || meta.number)
-            ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
+            ? ${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}.trim()
             : (res.filename || '—');
           document.getElementById('titleValue').textContent = pillText;
 
@@ -1275,15 +1257,9 @@
           const r = await loadRandomTuneToHumData();
           if (r) {
             humData = r.text;
-
-            // set filename and update chip (fallback)
-            filename = r.filename;
-            const fnEl = document.getElementById('statusFilename');
-            if (fnEl) fnEl.textContent = filename || '—';
-
             const meta = extractSecondSpineMeta(humData);
             const pillText = (meta.dir || meta.title || meta.number)
-              ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
+              ? ${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}.trim()
               : (r.filename || '—');
             document.getElementById('titleValue').textContent = pillText;
 
