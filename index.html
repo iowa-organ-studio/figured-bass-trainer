@@ -1,14 +1,9 @@
-
-
-
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer5</title>
-
+<title>Figured Bass Trainer5.21</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
@@ -666,22 +661,34 @@ vrvToolkit.setOptions(baseOptions);
 
       /**
        * NEW: Determine the target diatonic letter for the given degree **preferentially by stepping
-       * from the spelled bass letter**. This preserves spelling semantics: C# -> counts from C, Db -> counts from D.
+       * from the spelled bass letter in the TARGET KEY**. This preserves spelling semantics:
+       * count intervals from the spelled bass letter that the *target key* would use.
        *
-       * If bassLetterSpelled is unavailable, fallback to the old behavior that finds a bass letter by matching pc.
+       * If that is not possible, fall back to stepping from the original spelled bass letter.
        */
       function targetLetterForDegree(newBassPc, degree, bassLetterSpelled) {
-        // Prefer letter-stepping from spelled bass if provided
+        const LETTERS7 = ['C','D','E','F','G','A','B'];
+
+        // 1) Preferred: find spelled bass letter in the target key (scaleLettersByPc)
+        if (scaleLettersByPc && Array.isArray(scaleLettersByPc[newBassPc]) && scaleLettersByPc[newBassPc].length > 0) {
+          // pick the first spelled letter for that pc in the target key
+          const targetBassLetter = String(scaleLettersByPc[newBassPc][0] || '').toUpperCase();
+          const startIdx = LETTERS7.indexOf(targetBassLetter);
+          if (startIdx !== -1) {
+            return LETTERS7[(startIdx + (degree - 1)) % 7];
+          }
+        }
+
+        // 2) Fallback: if the original spelled bass letter is provided, step from it
         if (bassLetterSpelled && typeof bassLetterSpelled === 'string') {
-          const LETTERS7 = ['C','D','E','F','G','A','B'];
           const startIdx = LETTERS7.indexOf(bassLetterSpelled.toUpperCase());
           if (startIdx !== -1) {
             return LETTERS7[(startIdx + (degree - 1)) % 7];
           }
         }
 
-        // Fallback: find a letter in the target key whose diatonic pc matches newBassPc
-        if (!scalePCByLetter || !scaleLettersByPc) return null;
+        // 3) Final fallback: find a letter in the target key whose diatonic pc matches newBassPc and step from that.
+        if (!scalePCByLetter) return null;
 
         let bassLetterInTargetKey = null;
         for (const L of Object.keys(scalePCByLetter)) {
@@ -689,7 +696,6 @@ vrvToolkit.setOptions(baseOptions);
         }
         if (!bassLetterInTargetKey) return null;
 
-        const LETTERS7 = ['C','D','E','F','G','A','B'];
         const bassIdxInLetters = LETTERS7.indexOf(bassLetterInTargetKey);
         return LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
       }
@@ -980,13 +986,28 @@ vrvToolkit.setOptions(baseOptions);
       // Always run the preparation pass so 4th spine can override even with 0 transpose
       const preparedHum = prepareFiguredBassForTranspose(humData || "", currentSemitones);
 
+      // Determine transposed key display (what the app thinks it's transposing to)
+      let transposedKeyDisplay = null;
+      if (originalKeyIndex !== null) {
+        const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
+        const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
+        transposedKeyDisplay = tonicDisplayWithGlyphs(tonicRaw) + (originalIsMajor ? ' major' : ' minor');
+      } else {
+        transposedKeyDisplay = (currentSemitones === 0 && octaveShift === 0) ? 'original' : ('transposed chromatically ' + String(currentSemitones + (octaveShift*12)) + ' st');
+      }
+
       const semText = String(currentSemitones || 0);
       const actualAccLine = '##Actual Accidentals=' + (conventionsMode === 'modern' ? 'TRUE' : 'FALSE');
+
+      // Add explicit line that says what key the app thinks it's transposing to:
+      const transposedKeyLine = '##Transposed Key=' + (transposedKeyDisplay || '(unknown)');
+
       const panelContent = [
         '##original humdrum file##',
         humData || '(empty)',
         '##currently displayed humdrum##',
         '##transpose ' + semText + ' semitones',
+        transposedKeyLine,
         actualAccLine,
         preparedHum || '(empty)'
       ].join('\n\n');
@@ -1499,12 +1520,3 @@ async function pickRandomTuneAndTranspose() {
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
