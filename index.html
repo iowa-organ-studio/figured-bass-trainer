@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Figured Bass Trainer 5.24</title>
+  <title>Figured Bass Trainer 5.25(fixed neutralize helper spines)</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
@@ -612,50 +612,61 @@
 
       const lines = humText.split(/\r?\n/);
 
-      // --------- find header block: first line with '**' and last consecutive header-ish line ----------
+      // --------- find header start (first ** line) and header block end (last header-ish line) ----------
       let headerStart = -1;
       for (let i = 0; i < lines.length; i++) {
         if (/^\s*\*\*/.test(lines[i])) { headerStart = i; break; }
       }
       if (headerStart === -1) return humText;
 
-      // extend header until we reach the first data-row marker (a line that starts with '=' or a kern data token like "4" followed by a note)
+      // identify header block (include subsequent single-star header lines like *clef etc.)
       let headerBlockEnd = headerStart;
       for (let i = headerStart + 1; i < lines.length; i++) {
         const ln = (lines[i] || '').trim();
         if (ln === '') { headerBlockEnd = i; continue; }
-        // treat as start of body when line begins with '=' (measure), or a data row that begins with a digit+letter like "4C" or "." (sounding data)
+        // treat "=" (measure), digit-lines (data), or "." rows as start of body
         if (/^[=]/.test(ln) || /^[0-9]/.test(ln) || /^\./.test(ln)) { headerBlockEnd = i - 1; break; }
-        // keep including single-star lines that are still part of header (like *clefF4 etc.)
         if (/^\*/.test(ln) || /^!!/.test(ln) || /^\*\*/.test(ln)) { headerBlockEnd = i; continue; }
-        // default: if we hit a line that doesn't look like header, stop header
         headerBlockEnd = i - 1;
         break;
       }
-
-      // Fallback
       if (headerBlockEnd < headerStart) headerBlockEnd = headerStart;
 
       const preHeaderLines = lines.slice(0, headerBlockEnd + 1);
       const restLines      = lines.slice(headerBlockEnd + 1);
 
-      // --------- global max numerals for alignment (from original fb column) ----------
-      let globalMax = 0;
-      const fbIndex = (function(){
-        // locate fb index in header tokens (from the header block's **... line)
-        const headerLine = preHeaderLines.find(l => /^\s*\*\*/.test(l));
-        if (!headerLine) return null;
-        const toks = (headerLine.indexOf('\t') !== -1) ? headerLine.split('\t') : headerLine.split(/\s+/);
-        for (let c=0;c<toks.length;c++){
-          const t = String(toks[c]);
-          if (t.startsWith('**fb') || t.startsWith('**fba') || t.startsWith('**fbb')) return c;
-        }
-        return null;
-      })();
+      // locate column indices from header (kern, fb, actual text, force text)
+      let kernIndices = [];
+      let fbIndex = null;
+      let actualTextIndex = null;
+      let forceTextIndex = null;
 
-      // If fbIndex can't be found, return original unchanged
+      const headerLineForCols = preHeaderLines.find(l => /^\s*\*\*/.test(l)) || preHeaderLines[0] || '';
+      const headerToks = (headerLineForCols.indexOf('\t') !== -1) ? headerLineForCols.split('\t') : headerLineForCols.split(/\s+/);
+      for (let c = 0; c < headerToks.length; c++) {
+        const t = String(headerToks[c]);
+        if (t.startsWith('**kern')) kernIndices.push(c);
+        if (t.startsWith('**fb') || t.startsWith('**fba') || t.startsWith('**fbb')) {
+          if (fbIndex === null) fbIndex = c;
+        }
+      }
+      if (fbIndex !== null) {
+        // find first and second **text after fbIndex
+        let foundFirst = false;
+        for (let c = fbIndex + 1; c < headerToks.length; c++) {
+          const t = String(headerToks[c]);
+          if (t.startsWith('**text')) {
+            if (!foundFirst) { actualTextIndex = c; foundFirst = true; }
+            else { forceTextIndex = c; break; }
+          }
+        }
+      }
+
+      // If no fb found, nothing to do: return original
       if (fbIndex === null) return humText;
 
+      // --------- global max numerals for alignment (from original fb column) ----------
+      let globalMax = 0;
       for (const line of restLines) {
         if (!line) continue;
         if (/^\s*[\*\!]/.test(line)) continue; // skip headerish/comment lines
@@ -672,7 +683,7 @@
         globalMax = Math.max(globalMax, numeralsCount);
       }
 
-      // --------- target key map (major / natural minor) ----------
+      // --------- diatonic map ----------
       const scalePCByLetter = findScaleMapFor(semitones);
       const scaleLettersByPc = scalePCByLetter
         ? Object.keys(scalePCByLetter).reduce((acc, L) => {
@@ -683,8 +694,7 @@
           }, {})
         : null;
 
-      // ===== Helpers (5a–5c logic) =====
-
+      // ===== Helper small functions =====
       function pcNewBass(bassInfo) {
         return (bassInfo.pc + semitones + 120) % 12;
       }
@@ -697,27 +707,22 @@
             return LETTERS7[(startIdx + (degree - 1)) % 7];
           }
         }
-
         if (!scalePCByLetter || !scaleLettersByPc) return null;
-
         let bassLetterInTargetKey = null;
         for (const L of Object.keys(scalePCByLetter)) {
           if (scalePCByLetter[L] === newBassPc) { bassLetterInTargetKey = L; break; }
         }
         if (!bassLetterInTargetKey) return null;
-
-        const bassIdxInLetters = LETTERS7.indexOf(bassLetterInTargetKey);
-        return LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
+        const bassIdxInLetters = LETTERS.indexOf(bassLetterInTargetKey);
+        return LETTERS[(bassIdxInLetters + (degree - 1)) % 7];
       }
 
       function accidentalForDirection(targetLetter, direction) {
         if (!targetLetter || !scalePCByLetter) return null;
-
         const diatonicPc = scalePCByLetter[targetLetter];
         const naturalPc  = LETTER_TO_INDEX[targetLetter];
 
         const dir = (direction || '').toString().trim();
-
         function offsetFromToken(tok) {
           if (!tok) return 0;
           if (/^n$/i.test(tok)) return 0;
@@ -728,17 +733,14 @@
           if (/^[\/\\]$/.test(tok)) return 1;
           return null;
         }
-
         const off = offsetFromToken(dir);
         if (off === null) return null;
-
         let desiredPc;
         if ((/^[#♯b♭\-nN\/\\]$/.test(dir))) {
           desiredPc = (naturalPc + off + 12) % 12;
         } else {
           desiredPc = (diatonicPc + off + 12) % 12;
         }
-
         const finalAccSym = accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc);
         return finalAccSym;
       }
@@ -790,10 +792,10 @@
       }
 
       function parseFbTokenParts(tok) {
-        // split on spaces but preserve tokens like "4#|"
         return String(tok).trim().split(/\s+/).filter(Boolean);
       }
 
+      // transposed spelled kern for panel display
       function transposedKernForToken(rawKernTok) {
         if (!rawKernTok) return rawKernTok || '.';
         const m = String(rawKernTok).match(/^(\d+)?([A-Ga-g])([#♯b♭-]{0,2})/);
@@ -819,19 +821,14 @@
       // processors
       function processFbPartHistorical(partRaw, kernTok) {
         if (!partRaw || /^[\*\=\!\|]/.test(partRaw) || partRaw === '.') return partRaw;
-
         const fullToken = String(partRaw);
         if (isHistoricalPassThroughToken(fullToken)) return fullToken;
-
         let trailingBar = '';
         let part = fullToken;
         if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
-
         const parsed = parseFigurePart(part);
         if (!parsed) return fullToken;
-
         if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
-
         const bassInfo = parseKernPitch(kernTok);
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
@@ -841,7 +838,6 @@
         if (!targetLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-
         const finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
         if (finalAccSym === null) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
@@ -853,36 +849,28 @@
 
       function processFbPartActual(partFromActualSpine, kernTok) {
         if (!partFromActualSpine || /^[\*\=\!\|]/.test(partFromActualSpine) || partFromActualSpine === '.') return partFromActualSpine;
-
         let trailingBar = '';
         let part = String(partFromActualSpine);
         if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
-
         const parsed = parseFigurePart(part);
         if (!parsed) return partFromActualSpine;
-
         if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
-
         const bassInfo = parseKernPitch(kernTok);
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-
         const newBassPc    = pcNewBass(bassInfo);
         const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
         if (!targetLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-
         let finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
         if (finalAccSym === null) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-
         if (finalAccSym === '' && /n/i.test(parsed.acc)) {
           finalAccSym = 'n';
         }
-
         return parsed.accOnly
           ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
           : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
@@ -890,14 +878,11 @@
 
       function processForceDiatonicPart(partFromForceSpine, kernTok) {
         if (!partFromForceSpine || /^[\*\=\!\|]/.test(partFromForceSpine) || partFromForceSpine === '.') return partFromForceSpine;
-
         let trailingBar = '';
         let token = String(partFromForceSpine);
         if (token.endsWith('|')) { trailingBar = '|'; token = token.slice(0, -1); }
-
         const parsed = parseForceDiatonicPart(token);
         if (!parsed) return partFromForceSpine;
-
         const bassInfo = parseKernPitch(kernTok);
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
           return String(parsed.degree) + 'n' + trailingBar;
@@ -907,20 +892,18 @@
         if (!targetLetter) {
           return String(parsed.degree) + 'n' + trailingBar;
         }
-
         const diatonicAcc = accidentalForDiatonic(targetLetter);
         const outAcc = diatonicAcc || 'n';
         return String(parsed.degree) + toHumdrumAcc(outAcc) + trailingBar;
       }
 
       // ===== process body lines =====
-
       let lastKernTokForBass = null;
 
       const processedRest = restLines.map(line => {
         if (!line) return line;
 
-        // If this line looks like a header or comment, keep it exactly as-is (do not process as a data row).
+        // keep header-like lines verbatim
         if (/^\s*\*\*/.test(line) || /^\s*\*/.test(line) || /^\s*!!/.test(line)) {
           return line;
         }
@@ -928,15 +911,17 @@
         const useTabs = line.indexOf('\t') !== -1;
         const toks = useTabs ? line.split('\t') : line.split(/\s+/);
 
-        // ensure we have enough columns
+        // ensure enough columns
         const maxIdxToEnsure = Math.max(
           fbIndex,
-          ...(Array.isArray(kernIndicesPlaceholder()) ? kernIndicesPlaceholder() : [-1])
+          ...(kernIndices.length ? kernIndices : [-1]),
+          (actualTextIndex != null ? actualTextIndex : -1),
+          (forceTextIndex  != null ? forceTextIndex : -1)
         );
         while (toks.length <= maxIdxToEnsure) toks.push('.');
 
-        // carry-forward bass
-        const kernTokRaw = (kernIndicesPlaceholder() && kernIndicesPlaceholder().length) ? toks[kernIndicesPlaceholder()[0]] : null;
+        // carry-forward bass token
+        const kernTokRaw = (kernIndices && kernIndices.length) ? toks[kernIndices[0]] : null;
         const parsedBassNow = parseKernPitch(kernTokRaw);
         if (parsedBassNow && typeof parsedBassNow.pc === 'number') {
           lastKernTokForBass = kernTokRaw;
@@ -945,29 +930,26 @@
           ? kernTokRaw
           : lastKernTokForBass;
 
-        // pick sources with precedence: 4th (always) > 3rd (if Actual) > 2nd
+        // choose source token precedence: forceText (4th) > actual (3rd, when modern) > fb (2nd)
         const fbTokSrc  = toks[fbIndex];
-        // helper spines will be at known positions (we used header to find their indices earlier)
-        // but to avoid mistakes, attempt to find actualTextIndex/forceTextIndex again conservatively
-        const forceTok  = (function(){
-          // look for text tokens after fbIndex in this line
-          if (toks.length > fbIndex + 1) return toks[fbIndex + 1];
-          return null;
-        })();
-        const actualTok = null; // only used when conventionsMode === 'modern' and we earlier detected actualTextIndex; to keep logic robust, we prefer fbTokSrc or forceTok
+        const forceTok  = (forceTextIndex != null) ? toks[forceTextIndex] : null;
+        const actualTok = (actualTextIndex != null) ? toks[actualTextIndex] : null;
 
         let processedParts = null;
 
+        // If force (4th) present, use it; else if actual present and modern mode, use actual; else historical fb
         if (forceTok && !/^[\*\=\!\|]/.test(forceTok) && forceTok !== '.') {
           const parts = String(forceTok).trim().split(/\s+/).filter(Boolean);
           processedParts = parts.map(p => processForceDiatonicPart(p, kernTok));
+        } else if (conventionsMode === 'modern' && actualTok && !/^[\*\=\!\|]/.test(actualTok) && actualTok !== '.') {
+          const parts = String(actualTok).trim().split(/\s+/).filter(Boolean);
+          processedParts = parts.map(p => processFbPartActual(p, kernTok));
         } else if (fbTokSrc && !/^[\*\=\!\|]/.test(fbTokSrc) && fbTokSrc !== '.') {
           const parts = parseFbTokenParts(fbTokSrc);
           processedParts = parts.map(p => processFbPartHistorical(p, kernTok));
         }
 
         if (processedParts && processedParts.length) {
-          // ensure numerals count and global alignment preserved
           let numeralsNow = processedParts.reduce((acc, p) =>
             acc + ((String(p).match(/\d+/g) || []).length || (/\d/.test(p) ? 1 : 0)), 0);
           if (numeralsNow === 0 && processedParts.some(p => /\d/.test(p))) numeralsNow = 1;
@@ -978,23 +960,24 @@
             : processedParts.join(' ');
         }
 
+        // After we have extracted data from the helper spines, neutralize them on data rows:
+        function neutralizeHelperToken(tok) {
+          if (!tok) return '.';
+          if (/^[\*\=\!|]/.test(tok)) return tok; // keep structural markers
+          return '.';
+        }
+        if (actualTextIndex != null) toks[actualTextIndex] = neutralizeHelperToken(toks[actualTextIndex]);
+        if (forceTextIndex  != null) toks[forceTextIndex]  = neutralizeHelperToken(toks[forceTextIndex]);
+
         // Replace displayed kern token with transposed spelled token for the panel display (only in the first kern column)
-        if (kernIndicesPlaceholder() && kernIndicesPlaceholder().length && kernTok) {
+        if (kernIndices && kernIndices.length && kernTok) {
           try {
-            toks[kernIndicesPlaceholder()[0]] = transposedKernForToken(kernTok);
+            toks[kernIndices[0]] = transposedKernForToken(kernTok);
           } catch (e) {
-            // on any error, leave original token
+            // if something fails, leave token as-is
           }
         }
 
-        // NEUTRALIZE helper spines on DATA rows only (preserve * / = / ! / |)
-        function neutralizeHelperToken(tok) {
-          if (!tok) return '.';
-          if (/^[\*\=\!|]/.test(tok)) return tok;
-          return '.';
-        }
-
-        // return reconstructed line
         return useTabs ? toks.join('\t') : toks.join(' ');
       });
 
@@ -1004,7 +987,6 @@
         const useTabs = hl.indexOf('\t') !== -1;
         const toks = useTabs ? hl.split('\t') : hl.split(/\s+/);
 
-        // Convert **fb -> **fba only if figuresAbove
         if (figuresAbove) {
           for (let c = 0; c < toks.length; c++) {
             if (String(toks[c]).startsWith('**fb') && !String(toks[c]).startsWith('**fba')) {
@@ -1013,11 +995,11 @@
           }
         }
 
-        // do not neutralize or rewrite other header tokens (preserve them exactly), except helper text spines if we can find them
-        for (let c = 0; c < toks.length; c++) {
-          if (String(toks[c]).startsWith('**text') && (c === actualTextIndexPlaceholder() || c === forceTextIndexPlaceholder())) {
-            toks[c] = '**text-hidden';
-          }
+        if (actualTextIndex != null && toks[actualTextIndex] && String(toks[actualTextIndex]).startsWith('**text')) {
+          toks[actualTextIndex] = '**text-hidden';
+        }
+        if (forceTextIndex != null && toks[forceTextIndex] && String(toks[forceTextIndex]).startsWith('**text')) {
+          toks[forceTextIndex] = '**text-hidden';
         }
 
         return useTabs ? toks.join('\t') : toks.join(' ');
@@ -1027,53 +1009,6 @@
       processedHeader.forEach(hl => finalLines.push(hl));
       processedRest.forEach(rl => finalLines.push(rl));
       return finalLines.join('\n');
-
-      // -- helper placeholders (scoped closures can't refer to some indices above directly in all branches)
-      function kernIndicesPlaceholder() {
-        // find first **kern column index from header lines quickly (cached by searching preHeaderLines)
-        const headerLine = preHeaderLines.find(l => /^\s*\*\*/.test(l));
-        if (!headerLine) return [];
-        const toks = (headerLine.indexOf('\t') !== -1) ? headerLine.split('\t') : headerLine.split(/\s+/);
-        const out = [];
-        for (let c=0;c<toks.length;c++){
-          if (String(toks[c]).startsWith('**kern')) out.push(c);
-        }
-        return out;
-      }
-      function actualTextIndexPlaceholder() {
-        // best-effort find: first **text after fb in header
-        const headerLine = preHeaderLines.find(l => /^\s*\*\*/.test(l));
-        if (!headerLine) return null;
-        const toks = (headerLine.indexOf('\t') !== -1) ? headerLine.split('\t') : headerLine.split(/\s+/);
-        // find fb index
-        let fbIdx = -1;
-        for (let c=0;c<toks.length;c++){
-          if (String(toks[c]).startsWith('**fb') || String(toks[c]).startsWith('**fba') || String(toks[c]).startsWith('**fbb')) { fbIdx = c; break; }
-        }
-        if (fbIdx === -1) return null;
-        for (let c = fbIdx+1; c < toks.length; c++) {
-          if (String(toks[c]).startsWith('**text')) return c;
-        }
-        return null;
-      }
-      function forceTextIndexPlaceholder() {
-        const headerLine = preHeaderLines.find(l => /^\s*\*\*/.test(l));
-        if (!headerLine) return null;
-        const toks = (headerLine.indexOf('\t') !== -1) ? headerLine.split('\t') : headerLine.split(/\s+/);
-        let fbIdx = -1;
-        for (let c=0;c<toks.length;c++){
-          if (String(toks[c]).startsWith('**fb') || String(toks[c]).startsWith('**fba') || String(toks[c]).startsWith('**fbb')) { fbIdx = c; break; }
-        }
-        if (fbIdx === -1) return null;
-        let firstFound = null;
-        for (let c = fbIdx+1; c < toks.length; c++) {
-          if (String(toks[c]).startsWith('**text')) {
-            if (firstFound === null) firstFound = c;
-            else return c;
-          }
-        }
-        return null;
-      }
     }
 
     /* -------------------- render & helpers -------------------- */
@@ -1084,7 +1019,7 @@
     function renderWithTranspose() {
       const humPanelEl = document.getElementById('humPanel');
 
-      // run preparation pass
+      // Always run the preparation pass so 4th spine can override even with 0 transpose
       const preparedHum = prepareFiguredBassForTranspose(humData || "", currentSemitones);
 
       // Determine transposed key display
@@ -1510,8 +1445,6 @@
         meta: sourcePick.meta
       };
     }
-
-
 
     /* -------------------- Random button wiring -------------------- */
     const rb = document.getElementById('randomBtn');
