@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Figured Bass Trainer5.22 (fixed)</title>
+  <title>Figured Bass Trainer5.23 (fixed)</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
@@ -743,20 +743,39 @@
       }
 
       // PRINT ACCIDENTAL RELATIVE TO THE NATURAL LETTER (Step 6)
+      // NEW BEHAVIOR: single accidentals ('#'/'b') treated relative to NATURAL; multi (##/bb) relative to DIATONIC
       function accidentalForDirection(targetLetter, direction) {
         if (!targetLetter || !scalePCByLetter) return null;
+
         const diatonicPc = scalePCByLetter[targetLetter];
         const naturalPc  = LETTER_TO_INDEX[targetLetter];
-        let desiredPc    = diatonicPc;
 
-        if (direction === '#' || /#[♯]/.test(direction)) desiredPc = (diatonicPc + 1) % 12;
-        else if (direction === 'b' || /b/.test(direction)) desiredPc = (diatonicPc + 11) % 12;
-        else if (direction === '##') desiredPc = (diatonicPc + 2) % 12;
-        else if (direction === 'bb') desiredPc = (diatonicPc + 10) % 12;
-        else if (/n/i.test(direction)) desiredPc = naturalPc;
-        else desiredPc = diatonicPc;
+        const dir = (direction || '').toString().trim();
 
-        // relative to natural (so F## -> '##', Ab -> 'b', etc.)
+        function offsetFromToken(tok) {
+          if (!tok) return 0;
+          if (/^n$/i.test(tok)) return 0;
+          if (/^##$/.test(tok)) return 2;
+          if (/^bb$/.test(tok)) return -2;
+          if (/^[#♯]$/.test(tok)) return 1;
+          if (/^[b♭\-]$/.test(tok)) return -1;
+          if (/^[\/\\]$/.test(tok)) return 1;
+          return null;
+        }
+
+        const off = offsetFromToken(dir);
+        if (off === null) return null;
+
+        // If dir is a single token '#', 'b', '-' or 'n', interpret relative to NATURAL.
+        // If dir is multi-character like '##' or 'bb', interpret relative to DIATONIC (legacy).
+        let desiredPc;
+        if ((/^[#♯b♭\-nN\/\\]$/.test(dir))) {
+          desiredPc = (naturalPc + off + 12) % 12;
+        } else {
+          // multi accidental or not recognized single -> diatonic-relative (legacy)
+          desiredPc = (diatonicPc + off + 12) % 12;
+        }
+
         const finalAccSym = accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc);
         return finalAccSym; // '', 'n', '#', 'b', '##', 'bb', or null
       }
@@ -806,6 +825,32 @@
           fullToken === '4#|' ||
           /[\\\/]$/.test(fullToken) // slashed endings
         );
+      }
+
+      // helper to produce a transposed spelled kern token for display
+      function transposedKernForToken(rawKernTok) {
+        if (!rawKernTok) return rawKernTok || '.';
+        // try to parse leading octave digits (like "4A", "3c", etc.)
+        const m = String(rawKernTok).match(/^(\d+)?([A-Ga-g])([#♯b♭-]{0,2})/);
+        if (!m) return rawKernTok;
+        const octave = m[1] || '';
+        const letter = m[2].toUpperCase();
+        let acc = m[3] || '';
+        if (acc === '-') acc = 'b';
+        const origPc = (function(){
+          if (!acc) return keyToIndex(letter, '');
+          if (acc === '#' || acc === '♯') return keyToIndex(letter, '#');
+          if (acc === 'b' || acc === '♭' || acc === '-') return keyToIndex(letter, 'b');
+          if (acc === '##') return (LETTER_TO_INDEX[letter] + 2) % 12;
+          if (acc === 'bb') return (LETTER_TO_INDEX[letter] + 10) % 12;
+          return keyToIndex(letter, acc[0] || '');
+        })();
+        if (typeof origPc !== 'number' || origPc === null) return rawKernTok;
+        const newPc = (origPc + semitones + 120) % 12;
+        // pick display spelling using indexToTonic (respects ACCIDENTAL_COUNT and originalAccidentalPref)
+        const displayName = indexToTonic(newPc, originalAccidentalPref || '');
+        // displayName may be like "F#" or "Gb" or "E"; attach octave prefix if present (kern style)
+        return (octave ? String(octave) : '') + String(displayName);
       }
 
       // ===== per-part processors =====
@@ -970,6 +1015,15 @@
           toks[fbIndex] = (figuresAbove && need > 0)
             ? (Array(need).fill('x').join(' ') + ' ' + processedParts.join(' ')).trim()
             : processedParts.join(' ');
+        }
+
+        // Replace displayed kern token with transposed spelled token for the panel display
+        if (kernIndices && kernIndices.length && kernTok) {
+          try {
+            toks[kernIndices[0]] = transposedKernForToken(kernTok);
+          } catch (e) {
+            // on any error, leave original token
+          }
         }
 
         // NEUTRALIZE helper spines on DATA rows only (preserve * / = / ! / |)
@@ -1210,7 +1264,6 @@
     /* -------------------- initial setup & render -------------------- */
     addAccidentalRangeButtons("keysRangeRowTop","keysRangeRowBottom");
     addExcludeCheckboxes("exRow", excludeTonics);
-   /* document.getElementById('titleValue').textContent = filename || '—'; */
 
     /* -------------------- Asc/Desc, Major/Minor, Max difficulty -------------------- */
     const ascBtn = document.getElementById('filterAscBtn');
@@ -1555,19 +1608,15 @@
 
           currentSemitones = res.semitones;
           octaveShift = 0;
-          // displayName is the canonical generation spelling; set display override to null (display toggle is user-only)
+          // displayName is the canonical generation spelling; set display override to null (display-toggle is user-only)
           displayTonicOverride = null;
           // Populate enharmonic cycle list from the chosen index (UI toggle will filter allowed ones)
           enharmonicCycleList = (res.enharmList && res.enharmList.length) ? res.enharmList.slice() : (originalKeyIndex !== null ? SAFE_TONICS_MAJOR[(originalKeyIndex+currentSemitones+120)%12] : []);
-          // Also set a "preferred generated display" by forcing indexToTonic/display selection via displayTonicOverride only for immediate display,
-          // but keep it separate: use generated display for rendering by choosing the topology in renderWithTranspose (we will honor displayTonicOverride for Verovio but
-          // the figured-bass transformation used the canonical spelling at generation time via findScaleMapFor).
-          // To make the UI show the generation spelling initially, set displayTonicOverride to res.displayName (allowed & validated).
+          // Set initial display override when valid
           const excluded = getExcludedTonicsSet();
           const dnNorm = tonicNameNormalized(res.displayName || '');
           const dnCnt = dnNorm in ACCIDENTAL_COUNT ? ACCIDENTAL_COUNT[dnNorm] : null;
           if (dnCnt !== null && dnCnt <= 7 && !excluded.has(dnNorm)) {
-            // Use as initial display name; user can toggle later (display-only).
             displayTonicOverride = res.displayName;
           } else {
             displayTonicOverride = null;
