@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer5.21</title>
+  <title>Figured Bass Trainer5.22 (fixed)</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
@@ -293,18 +293,40 @@
     }
 
     /* -------------------- enharmonic display toggle -------------------- */
-    let displayTonicOverride = null;
+    let displayTonicOverride = null; // display-only; must not affect generation
     let enharmonicCycleList = null;
     function toggleEnharmonicDisplay() {
-      if (!enharmonicCycleList || enharmonicCycleList.length <= 1) {
-        displayTonicOverride = enharmonicCycleList ? enharmonicCycleList[0] : displayTonicOverride;
+      // display-only: cycle allowed enharmonic spellings for current target index
+      if (!enharmonicCycleList || !enharmonicCycleList.length) {
+        displayTonicOverride = null;
         renderWithTranspose();
         return;
       }
-      const cur = displayTonicOverride || enharmonicCycleList[0];
-      let i = enharmonicCycleList.findIndex(n => tonicNameNormalized(n) === tonicNameNormalized(cur));
+
+      const excluded = getExcludedTonicsSet();
+      // allowed display spellings: <=7 accidentals and not excluded
+      const allowed = enharmonicCycleList.filter(n => {
+        const norm = tonicNameNormalized(n);
+        const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+        return (cnt !== null && cnt <= 7 && !excluded.has(norm));
+      });
+
+      if (!allowed.length) {
+        displayTonicOverride = null;
+        renderWithTranspose();
+        console.warn('No allowed enharmonic spellings available (exclusions or >7 accidentals).');
+        return;
+      }
+
+      if (!displayTonicOverride) {
+        displayTonicOverride = allowed[0];
+        renderWithTranspose();
+        return;
+      }
+
+      let i = allowed.findIndex(n => tonicNameNormalized(n) === tonicNameNormalized(displayTonicOverride));
       if (i === -1) i = 0;
-      const next = enharmonicCycleList[(i+1) % enharmonicCycleList.length];
+      const next = allowed[(i + 1) % allowed.length];
       displayTonicOverride = next;
       renderWithTranspose();
     }
@@ -451,22 +473,22 @@
     } catch (e) { console.warn(e); }
 
     /* -------------------- verovio & base options -------------------- */
-if (!(window.verovio && typeof verovio.toolkit === 'function')) {
-  document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths: verovio-toolkit-wasm.js and verovio-toolkit-hum.js';
-  document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)');
-  return;
-}
+    if (!(window.verovio && typeof verovio.toolkit === 'function')) {
+      document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths: verovio-toolkit-wasm.js and verovio-toolkit-hum.js';
+      document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)');
+      return;
+    }
 
-// instantiate verovio toolkit
-const vrvToolkit = new verovio.toolkit();
+    // instantiate verovio toolkit
+    const vrvToolkit = new verovio.toolkit();
 
-const baseOptions = {
-  scale: 50, pageWidth: 900, adjustPageHeight: true,
-  spacingLinear: 0.50,
-  spacingNonLinear: 0.50 * (0.46 / 0.32), // preserve ratio
-  spacingSystem: 10, spacingStaff: 8
-};
-vrvToolkit.setOptions(baseOptions);
+    const baseOptions = {
+      scale: 50, pageWidth: 900, adjustPageHeight: true,
+      spacingLinear: 0.50,
+      spacingNonLinear: 0.50 * (0.46 / 0.32), // preserve ratio
+      spacingSystem: 10, spacingStaff: 8
+    };
+    vrvToolkit.setOptions(baseOptions);
 
 
     /* -------------------- state -------------------- */
@@ -538,10 +560,44 @@ vrvToolkit.setOptions(baseOptions);
     const SCALE_OFFSETS_MAJOR = [0,2,4,5,7,9,11];
     const SCALE_OFFSETS_NAT_MINOR = [0,2,3,5,7,8,10];
 
+    // FIXED: choose canonical target tonic spelling for generation; DO NOT consult displayTonicOverride here.
     function findScaleMapFor(semitonesOffset) {
       if (typeof originalKeyIndex !== 'number' || originalKeyIndex === null) return null;
       const targetKeyIndex = (originalKeyIndex + semitonesOffset + 120) % 12;
-      const tonicName = indexToTonic(targetKeyIndex, originalAccidentalPref) || 'C';
+
+      // Choose canonical tonic for generation time purposes only.
+      function chooseCanonicalTonicForIndex(idx) {
+        const candidates = SAFE_TONICS_MAJOR[idx] || [];
+
+        const infos = candidates.map(n => {
+          const norm = tonicNameNormalized(n);
+          const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+          return { raw: n, norm, cnt };
+        });
+
+        // prefer non-theoretical with known counts <= 7
+        const usable = infos.filter(i => i.cnt !== null && i.cnt <= 7);
+        if (usable.length === 1) return usable[0].raw;
+        if (usable.length > 1) {
+          // deterministic: prefer flats, else smallest accidental count, else lexical
+          const flat = usable.find(u => String(u.raw).includes('b'));
+          if (flat) return flat.raw;
+          usable.sort((a,b) => a.cnt - b.cnt || a.raw.localeCompare(b.raw));
+          return usable[0].raw;
+        }
+
+        // no usable counts: prefer a flat candidate if present
+        if (candidates.length > 1) {
+          const flatCandidate = candidates.find(n => n.includes('b'));
+          if (flatCandidate) return flatCandidate;
+          return candidates[0];
+        }
+
+        // fallback
+        return indexToTonic(idx, '');
+      }
+
+      const tonicName = chooseCanonicalTonicForIndex(targetKeyIndex);
       const tonicLetter = tonicName[0].toUpperCase();
       const OFFSETS = originalIsMajor ? SCALE_OFFSETS_MAJOR : SCALE_OFFSETS_NAT_MINOR;
       const tonicLetterIdx = LETTERS.indexOf(tonicLetter);
@@ -660,26 +716,12 @@ vrvToolkit.setOptions(baseOptions);
       }
 
       /**
-       * NEW: Determine the target diatonic letter for the given degree **preferentially by stepping
-       * from the spelled bass letter in the TARGET KEY**. This preserves spelling semantics:
-       * count intervals from the spelled bass letter that the *target key* would use.
-       *
-       * If that is not possible, fall back to stepping from the original spelled bass letter.
+       * Determine the target diatonic letter for the given degree preferentially by stepping
+       * from the spelled bass letter (falls back to the map if necessary).
        */
       function targetLetterForDegree(newBassPc, degree, bassLetterSpelled) {
+        // Prefer letter-stepping from spelled bass if provided
         const LETTERS7 = ['C','D','E','F','G','A','B'];
-
-        // 1) Preferred: find spelled bass letter in the target key (scaleLettersByPc)
-        if (scaleLettersByPc && Array.isArray(scaleLettersByPc[newBassPc]) && scaleLettersByPc[newBassPc].length > 0) {
-          // pick the first spelled letter for that pc in the target key
-          const targetBassLetter = String(scaleLettersByPc[newBassPc][0] || '').toUpperCase();
-          const startIdx = LETTERS7.indexOf(targetBassLetter);
-          if (startIdx !== -1) {
-            return LETTERS7[(startIdx + (degree - 1)) % 7];
-          }
-        }
-
-        // 2) Fallback: if the original spelled bass letter is provided, step from it
         if (bassLetterSpelled && typeof bassLetterSpelled === 'string') {
           const startIdx = LETTERS7.indexOf(bassLetterSpelled.toUpperCase());
           if (startIdx !== -1) {
@@ -687,8 +729,8 @@ vrvToolkit.setOptions(baseOptions);
           }
         }
 
-        // 3) Final fallback: find a letter in the target key whose diatonic pc matches newBassPc and step from that.
-        if (!scalePCByLetter) return null;
+        // Fallback: find a letter in the target key whose diatonic pc matches newBassPc
+        if (!scalePCByLetter || !scaleLettersByPc) return null;
 
         let bassLetterInTargetKey = null;
         for (const L of Object.keys(scalePCByLetter)) {
@@ -990,6 +1032,7 @@ vrvToolkit.setOptions(baseOptions);
       let transposedKeyDisplay = null;
       if (originalKeyIndex !== null) {
         const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
+        // displayTonicOverride is DISPLAY ONLY and may be null; if set and allowed, we'll show it
         const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
         transposedKeyDisplay = tonicDisplayWithGlyphs(tonicRaw) + (originalIsMajor ? ' major' : ' minor');
       } else {
@@ -1013,29 +1056,29 @@ vrvToolkit.setOptions(baseOptions);
       ].join('\n\n');
       if (humPanelEl) humPanelEl.textContent = panelContent;
 
-    // spacing-aware options: use viewer width if available, guard missing base values, cap extremes
-const baseLinear = baseOptions.spacingLinear || 0.32;
-const spacingNonLinearRatio =
-  (baseOptions.spacingNonLinear && baseOptions.spacingLinear)
-    ? baseOptions.spacingNonLinear / baseOptions.spacingLinear
-    : 1;
+      // spacing-aware options: use viewer width if available, guard missing base values, cap extremes
+      const baseLinear = baseOptions.spacingLinear || 0.32;
+      const spacingNonLinearRatio =
+        (baseOptions.spacingNonLinear && baseOptions.spacingLinear)
+          ? baseOptions.spacingNonLinear / baseOptions.spacingLinear
+          : 1;
 
-const scaleFactor = currentSpacingLinear / baseLinear;
+      const scaleFactor = currentSpacingLinear / baseLinear;
 
-// give Verovio more horizontal room as spacing grows
-const pageWidth =
-  Math.round(baseOptions.pageWidth * Math.max(1, scaleFactor * 1.5));
+      // give Verovio more horizontal room as spacing grows
+      const pageWidth =
+        Math.round(baseOptions.pageWidth * Math.max(1, scaleFactor * 1.5));
 
-const options = {
-  ...baseOptions,
-  scale: currentScale,
-  spacingLinear: currentSpacingLinear,
-  spacingNonLinear: currentSpacingLinear * spacingNonLinearRatio,
-  pageWidth
-};
+      const options = {
+        ...baseOptions,
+        scale: currentScale,
+        spacingLinear: currentSpacingLinear,
+        spacingNonLinear: currentSpacingLinear * spacingNonLinearRatio,
+        pageWidth
+      };
 
 
-           // Choose a suitable transpose option for Verovio.
+      // Choose a suitable transpose option for Verovio.
       // If we know the original key (originalKeyIndex), request transposition by target tonic (keeps key-based spellings).
       // Otherwise request chromatic semitone transposition (integer), which works even if input lacks key info.
       let transposeOption = "";
@@ -1227,9 +1270,8 @@ const options = {
     /**
      * Pick a display name for the given index.
      * - preferredCounts is a Set of accidental counts the user has selected (e.g. {7})
-     * - If any spellings match preferredCounts, pick randomly among those.
-     * - Otherwise, pick randomly among spellings whose accidental-count <= 7.
-     * - If none of the spellings have a known accidental-count, fall back to a canonical name.
+     * - If any spellings match preferredCounts, pick among those.
+     * - Otherwise pick a safe spelling (<=7), prefer flats, then lowest accidental count.
      */
     function pickDisplayNameForIndexByAccCount(idx, preferredCounts /* Set */) {
       const names = SAFE_TONICS_MAJOR[idx] || [];
@@ -1242,204 +1284,246 @@ const options = {
 
       // 1) prefer spellings that match the user's selected buckets
       const preferred = withCount.filter(x => x.cnt !== null && preferredCounts.has(x.cnt)).map(x => x.raw);
-      if (preferred.length) return preferred[Math.floor(Math.random() * preferred.length)];
+      if (preferred.length) {
+        // deterministic: prefer flats among preferred
+        const flat = preferred.find(p => String(p).includes('b'));
+        if (flat) return flat;
+        preferred.sort();
+        return preferred[0];
+      }
 
       // 2) otherwise use any spelling that is not "theoretical" (>7 accidentals)
       const nonTheoretical = withCount.filter(x => x.cnt !== null && x.cnt <= 7).map(x => x.raw);
-      if (nonTheoretical.length) return nonTheoretical[Math.floor(Math.random() * nonTheoretical.length)];
+      if (nonTheoretical.length) {
+        const flat = nonTheoretical.find(p => String(p).includes('b'));
+        if (flat) return flat;
+        // prefer lowest accidental count
+        nonTheoretical.sort((a,b) => {
+          const aCnt = ACCIDENTAL_COUNT[tonicNameNormalized(a)];
+          const bCnt = ACCIDENTAL_COUNT[tonicNameNormalized(b)];
+          return (aCnt - bCnt) || a.localeCompare(b);
+        });
+        return nonTheoretical[0];
+      }
 
       // 3) fallback: return any name (maybe unknown) or indexToTonic
-      if (names.length) return names[Math.floor(Math.random() * names.length)];
+      if (names.length) return names[0];
       return indexToTonic(idx, '');
     }
-// Return true if this pitch-class index has at least one MAJOR spelling
-// with <= 7 accidentals. Blocks theoretical major keys like G# major, A# major.
-// Helper: ensure an index can be a practical MAJOR key (some spelling <= 7 accidentals)
-function isMajorKeyAllowedForIndex(idx) {
-  const cand = SAFE_TONICS_MAJOR[idx] || [];
-  for (const n of cand) {
-    const norm = tonicNameNormalized(n);
-    if (norm in ACCIDENTAL_COUNT && ACCIDENTAL_COUNT[norm] <= 7) {
-      return true;
-    }
-  }
-  return false;
-}
 
-async function pickRandomTuneAndTranspose() {
-  const tunesJsonPath = buildRelativeForAsset('tunes.json?_=' + Date.now());
-  let listResp;
-  try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); }
-  catch (e) { console.error('[pickRandomTuneAndTranspose] fetch failed', e); return null; }
-  if (!listResp || !listResp.ok) {
-    console.warn('[pickRandomTuneAndTranspose] tunes.json not available', listResp && listResp.status);
-    return null;
-  }
-
-  const listJson = await listResp.json();
-  const files = Array.isArray(listJson) ? listJson.slice() : (Array.isArray(listJson.files) ? listJson.files.slice() : []);
-  if (!files.length) { console.warn('[pickRandomTuneAndTranspose] no files listed'); return null; }
-
-  const candidates = [];
-  for (const f of files) {
-    try {
-      const fr = await fetchAsset(f);
-      if (!fr || !fr.ok) { console.warn('[pickRandomTuneAndTranspose] skipping missing', f); continue; }
-      const text = await fr.text();
-      const meta = extractSecondSpineMeta(text || '');
-      const dir = (meta.dir || '').toLowerCase();
-
-      const isAsc = /\bascend/.test(dir);
-      const isDesc = /\bdescend/.test(dir);
-
-      if (!filterAscending && isAsc) continue;
-      if (!filterDescending && isDesc) continue;
-
-      const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
-      if (!isNaN(num) && num > maxDifficulty) continue;
-      if (isNaN(num) && maxDifficulty < 7) continue;
-
-      const k = parseKeyInterpretation(text || '');
-      if (!k) continue;
-      const idx = keyToIndex(k.letter, k.accidental);
-      const isMajor = (k.letter === k.letter.toUpperCase());
-      if (!filterMajor && isMajor) continue;
-      if (!filterMinor && !isMajor) continue;
-
-      candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: indexToTonic(idx, '') }, meta });
-    } catch (e) { console.warn('[pickRandomTuneAndTranspose] error reading', f, e); }
-  }
-
-  if (!candidates.length) return null;
-
-  const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
-
-  // Make sure buckets are numeric (defensive)
-  const accidentalSet = new Set(Array.from(accidentalsSelected).map(x => Number(x)).filter(n => !Number.isNaN(n)));
-  const excluded = getExcludedTonicsSet();
-  const possibleTargets = [];
-
-  for (let idx = 0; idx < 12; idx++) {
-    // GLOBAL: block theoretical MAJOR keys such as G# major or A# major
-    if (!isMajorKeyAllowedForIndex(idx)) {
-      console.debug('[pick] skipping idx (theoretical major):', idx, SAFE_TONICS_MAJOR[idx]);
-      continue;
-    }
-
-    const names = SAFE_TONICS_MAJOR[idx] || [];
-    const nameInfos = names.map(n => {
-      const norm = tonicNameNormalized(n);
-      const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
-      return { raw: n, norm, cnt };
-    });
-
-    // Determine which signature-counts to check: major vs relative-minor mapping
-    const countsMajor = countsForIndexCandidates(idx);
-    const countsMinor = countsForIndexCandidates((idx + 3) % 12);
-
-    // If user wants to preserve mode of source, check appropriate bucket — but even if not,
-    // we'll still enforce accidentalSet matching later on the validSpellings.
-    const countsToCheck = sourcePick.original.isMajor ? countsMajor : countsMinor;
-
-    // If the user has ticked specific accidental buckets, require the index to expose one of those counts
-    if (accidentalSet.size > 0) {
-      const hasBucketMatch = countsToCheck.some(c => accidentalSet.has(Number(c)));
-      if (!hasBucketMatch) {
-        console.debug('[pick] idx', idx, 'no bucket match (countsToCheck):', countsToCheck, 'accSet:', Array.from(accidentalSet));
-        continue;
-      }
-    }
-
-    // Exclude tonics explicitly excluded by user
-    const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
-    if (anyExcluded) {
-      console.debug('[pick] idx', idx, 'excluded by user:', nameInfos.map(n=>n.norm));
-      continue;
-    }
-
-    // Only keep spellings that are non-theoretical (<=7)
-    const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
-    if (!validSpellings.length) {
-      console.debug('[pick] idx', idx, 'no non-theoretical spellings', nameInfos);
-      continue;
-    }
-
-    // If user bucketed, at least one valid spelling must match a bucket
-    if (accidentalSet.size > 0) {
-      const matchesBucket = validSpellings.some(n => accidentalSet.has(Number(n.cnt)));
-      if (!matchesBucket) {
-        console.debug('[pick] idx', idx, 'valid spellings but none match bucket', validSpellings.map(v=>v.raw));
-        continue;
-      }
-    }
-
-    possibleTargets.push({ idx, validSpellings });
-  }
-
-  // fallback: relax bucket constraint but still respect theoretical-major guard & exclusions
-  if (!possibleTargets.length) {
-    for (let idx = 0; idx < 12; idx++) {
-      const names = SAFE_TONICS_MAJOR[idx] || [];
-      const nameInfos = names.map(n => {
+    // Return true if this pitch-class index has at least one MAJOR spelling
+    // with <= 7 accidentals. Blocks theoretical major keys like G# major, A# major.
+    function isMajorKeyAllowedForIndex(idx) {
+      const cand = SAFE_TONICS_MAJOR[idx] || [];
+      for (const n of cand) {
         const norm = tonicNameNormalized(n);
+        if (norm in ACCIDENTAL_COUNT && ACCIDENTAL_COUNT[norm] <= 7) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    async function pickRandomTuneAndTranspose() {
+      const tunesJsonPath = buildRelativeForAsset('tunes.json?_=' + Date.now());
+      let listResp;
+      try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); }
+      catch (e) { console.error('[pickRandomTuneAndTranspose] fetch failed', e); return null; }
+      if (!listResp || !listResp.ok) {
+        console.warn('[pickRandomTuneAndTranspose] tunes.json not available', listResp && listResp.status);
+        return null;
+      }
+
+      const listJson = await listResp.json();
+      const files = Array.isArray(listJson) ? listJson.slice() : (Array.isArray(listJson.files) ? listJson.files.slice() : []);
+      if (!files.length) { console.warn('[pickRandomTuneAndTranspose] no files listed'); return null; }
+
+      const candidates = [];
+      for (const f of files) {
+        try {
+          const fr = await fetchAsset(f);
+          if (!fr || !fr.ok) { console.warn('[pickRandomTuneAndTranspose] skipping missing', f); continue; }
+          const text = await fr.text();
+          const meta = extractSecondSpineMeta(text || '');
+          const dir = (meta.dir || '').toLowerCase();
+
+          const isAsc = /\bascend/.test(dir);
+          const isDesc = /\bdescend/.test(dir);
+
+          if (!filterAscending && isAsc) continue;
+          if (!filterDescending && isDesc) continue;
+
+          const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
+          if (!isNaN(num) && num > maxDifficulty) continue;
+          if (isNaN(num) && maxDifficulty < 7) continue;
+
+          const k = parseKeyInterpretation(text || '');
+          if (!k) continue;
+          const idx = keyToIndex(k.letter, k.accidental);
+          const isMajor = (k.letter === k.letter.toUpperCase());
+          if (!filterMajor && isMajor) continue;
+          if (!filterMinor && !isMajor) continue;
+
+          candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: indexToTonic(idx, '') }, meta });
+        } catch (e) { console.warn('[pickRandomTuneAndTranspose] error reading', f, e); }
+      }
+
+      if (!candidates.length) return null;
+
+      const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
+
+      // Make sure buckets are numeric (defensive)
+      const accidentalSet = new Set(Array.from(accidentalsSelected).map(x => Number(x)).filter(n => !Number.isNaN(n)));
+      const excluded = getExcludedTonicsSet();
+      const possibleTargets = [];
+
+      for (let idx = 0; idx < 12; idx++) {
+        // GLOBAL: block theoretical MAJOR keys such as G# major or A# major
+        if (!isMajorKeyAllowedForIndex(idx)) {
+          console.debug('[pick] skipping idx (theoretical major):', idx, SAFE_TONICS_MAJOR[idx]);
+          continue;
+        }
+
+        const names = SAFE_TONICS_MAJOR[idx] || [];
+        const nameInfos = names.map(n => {
+          const norm = tonicNameNormalized(n);
+          const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+          return { raw: n, norm, cnt };
+        });
+
+        // Determine which signature-counts to check: major vs relative-minor mapping
+        const countsMajor = countsForIndexCandidates(idx);
+        const countsMinor = countsForIndexCandidates((idx + 3) % 12);
+
+        // If user wants to preserve mode of source, check appropriate bucket — but even if not,
+        // we'll still enforce accidentalSet matching later on the validSpellings.
+        const countsToCheck = sourcePick.original.isMajor ? countsMajor : countsMinor;
+
+        // If the user has ticked specific accidental buckets, require the index to expose one of those counts
+        if (accidentalSet.size > 0) {
+          const hasBucketMatch = countsToCheck.some(c => accidentalSet.has(Number(c)));
+          if (!hasBucketMatch) {
+            console.debug('[pick] idx', idx, 'no bucket match (countsToCheck):', countsToCheck, 'accSet:', Array.from(accidentalSet));
+            continue;
+          }
+        }
+
+        // Exclude tonics explicitly excluded by user
+        const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
+        if (anyExcluded) {
+          console.debug('[pick] idx', idx, 'excluded by user:', nameInfos.map(n=>n.norm));
+          continue;
+        }
+
+        // Only keep spellings that are non-theoretical (<=7)
+        const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
+        if (!validSpellings.length) {
+          console.debug('[pick] idx', idx, 'no non-theoretical spellings', nameInfos);
+          continue;
+        }
+
+        // If user bucketed, at least one valid spelling must match a bucket
+        if (accidentalSet.size > 0) {
+          const matchesBucket = validSpellings.some(n => accidentalSet.has(Number(n.cnt)));
+          if (!matchesBucket) {
+            console.debug('[pick] idx', idx, 'valid spellings but none match bucket', validSpellings.map(v=>v.raw));
+            continue;
+          }
+        }
+
+        possibleTargets.push({ idx, validSpellings });
+      }
+
+      // fallback: relax bucket constraint but still respect theoretical-major guard & exclusions
+      if (!possibleTargets.length) {
+        for (let idx = 0; idx < 12; idx++) {
+          const names = SAFE_TONICS_MAJOR[idx] || [];
+          const nameInfos = names.map(n => {
+            const norm = tonicNameNormalized(n);
+            const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+            return { raw: n, norm, cnt };
+          });
+          const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
+          if (anyExcluded) continue;
+          const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
+          if (!validSpellings.length) continue;
+          possibleTargets.push({ idx, validSpellings });
+        }
+      }
+
+      if (!possibleTargets.length) return null;
+
+      // pick random valid candidate
+      const chosen = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+
+      // Compute semitones (range -6..+6 preferred)
+      const srcIdx = (typeof sourcePick.original.index === 'number') ? sourcePick.original.index : 0;
+      let semitonesRaw = ((chosen.idx - srcIdx) + 120) % 12;
+      let sem = semitonesRaw;
+      if (sem > 6) sem = sem - 12;
+
+      // Determine displayName for generation (MUST NOT consult displayTonicOverride here).
+      // Build a deterministic list of valid spellings (<=7 accidentals and not excluded).
+      const validSpellings = (chosen.validSpellings || []).filter(s => {
+        const norm = tonicNameNormalized(s.raw || s);
         const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
-        return { raw: n, norm, cnt };
+        if (cnt === null) return false;
+        if (cnt > 7) return false;
+        if (excluded.has(norm)) return false;
+        // If user has bucket filters, ensure spelling matches an allowed bucket
+        if (accidentalSet.size > 0 && !accidentalSet.has(Number(cnt))) return false;
+        return true;
       });
-      const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
-      if (anyExcluded) continue;
-      const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
-      if (!validSpellings.length) continue;
-      possibleTargets.push({ idx, validSpellings });
+
+      let displayName = null;
+      if (!validSpellings.length) {
+        // If none matched the strict criteria, relax the accidentalSet constraint but still enforce <=7 and not excluded
+        const relaxed = (chosen.validSpellings || []).filter(s => {
+          const norm = tonicNameNormalized(s.raw || s);
+          const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
+          return (cnt !== null && cnt <= 7 && !excluded.has(norm));
+        });
+        if (relaxed.length) {
+          // deterministic: pick the one with lowest accidental count, prefer flats
+          relaxed.sort((a,b) => {
+            const aCnt = (tonicNameNormalized(a.raw||a) in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[tonicNameNormalized(a.raw||a)] : 999;
+            const bCnt = (tonicNameNormalized(b.raw||b) in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[tonicNameNormalized(b.raw||b)] : 999;
+            if (aCnt !== bCnt) return aCnt - bCnt;
+            if (String(a.raw||a).includes('b') && !String(b.raw||b).includes('b')) return -1;
+            if (String(b.raw||b).includes('b') && !String(a.raw||a).includes('b')) return 1;
+            return (a.raw||a).localeCompare(b.raw||b);
+          });
+          displayName = relaxed[0].raw || relaxed[0];
+        } else {
+          // No valid spelling for this idx — bail out (caller can pick another)
+          console.debug('[pick] no valid display spelling for chosen idx', chosen.idx);
+          return null;
+        }
+      } else {
+        // Choose deterministically among validSpellings (prefer flats, then lowest count)
+        validSpellings.sort((a,b) => {
+          const aCnt = (tonicNameNormalized(a.raw||a) in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[tonicNameNormalized(a.raw||a)] : 999;
+          const bCnt = (tonicNameNormalized(b.raw||b) in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[tonicNameNormalized(b.raw||b)] : 999;
+          if (aCnt !== bCnt) return aCnt - bCnt;
+          if (String(a.raw||a).includes('b') && !String(b.raw||b).includes('b')) return -1;
+          if (String(b.raw||b).includes('b') && !String(a.raw||a).includes('b')) return 1;
+          return (a.raw||a).localeCompare(b.raw||b);
+        });
+        displayName = validSpellings[0].raw || validSpellings[0];
+      }
+
+      // enharmList for UI: all SAFE spellings for the chosen idx
+      const enharmList = SAFE_TONICS_MAJOR[chosen.idx] || [];
+
+      return {
+        filename: sourcePick.filename,
+        text: sourcePick.text,
+        semitones: sem,
+        displayName: displayName,
+        enharmList: enharmList,
+        meta: sourcePick.meta
+      };
     }
-  }
-
-  if (!possibleTargets.length) return null;
-
-  // pick random valid candidate
-  const chosen = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
-
-  // Compute semitones (range -6..+6 preferred)
-  const srcIdx = (typeof sourcePick.original.index === 'number') ? sourcePick.original.index : 0;
-  let semitonesRaw = ((chosen.idx - srcIdx) + 120) % 12;
-  let sem = semitonesRaw;
-  if (sem > 6) sem = sem - 12;
-
-  // Prefer a display name that matches user's bucket if possible; fall back to pickDisplayName helper
-  let displayName = null;
-  const preferredCounts = accidentalSet;
-  const validSpellings = (chosen.validSpellings || []).filter(s => s.cnt !== null && s.cnt <= 7);
-
-  if (preferredCounts.size > 0) {
-    const pref = validSpellings.filter(s => preferredCounts.has(Number(s.cnt))).map(s => s.raw);
-    if (pref.length) displayName = pref[Math.floor(Math.random() * pref.length)];
-  }
-  if (!displayName) {
-    // last resort: use the safer pickDisplayNameForIndexByAccCount (it too prefers <=7)
-    displayName = pickDisplayNameForIndexByAccCount(chosen.idx, preferredCounts);
-  }
-
-  // Extra sanity: if the chosen displayName's accidental count doesn't match the bucket (when bucket non-empty),
-  // try to find an alternate spelling. If none fits, log and continue with the safer name (we filtered earlier so this is unlikely)
-  if (accidentalSet.size > 0) {
-    const dnNorm = tonicNameNormalized(displayName);
-    const dnCnt = (dnNorm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[dnNorm] : null;
-    if (dnCnt === null || !accidentalSet.has(Number(dnCnt))) {
-      // try to find alternate
-      const alt = (validSpellings || []).find(s => accidentalSet.has(Number(s.cnt)));
-      if (alt) displayName = alt.raw;
-      else console.debug('[pick] displayName did not match bucket but no alternate found for idx', chosen.idx, 'displayName', displayName);
-    }
-  }
-
-  return {
-    filename: sourcePick.filename,
-    text: sourcePick.text,
-    semitones: sem,
-    displayName: displayName,
-    enharmList: SAFE_TONICS_MAJOR[chosen.idx] || [],
-    meta: sourcePick.meta
-  };
-}
 
 
 
@@ -1471,8 +1555,23 @@ async function pickRandomTuneAndTranspose() {
 
           currentSemitones = res.semitones;
           octaveShift = 0;
-          displayTonicOverride = res.displayName || null;
+          // displayName is the canonical generation spelling; set display override to null (display toggle is user-only)
+          displayTonicOverride = null;
+          // Populate enharmonic cycle list from the chosen index (UI toggle will filter allowed ones)
           enharmonicCycleList = (res.enharmList && res.enharmList.length) ? res.enharmList.slice() : (originalKeyIndex !== null ? SAFE_TONICS_MAJOR[(originalKeyIndex+currentSemitones+120)%12] : []);
+          // Also set a "preferred generated display" by forcing indexToTonic/display selection via displayTonicOverride only for immediate display,
+          // but keep it separate: use generated display for rendering by choosing the topology in renderWithTranspose (we will honor displayTonicOverride for Verovio but
+          // the figured-bass transformation used the canonical spelling at generation time via findScaleMapFor).
+          // To make the UI show the generation spelling initially, set displayTonicOverride to res.displayName (allowed & validated).
+          const excluded = getExcludedTonicsSet();
+          const dnNorm = tonicNameNormalized(res.displayName || '');
+          const dnCnt = dnNorm in ACCIDENTAL_COUNT ? ACCIDENTAL_COUNT[dnNorm] : null;
+          if (dnCnt !== null && dnCnt <= 7 && !excluded.has(dnNorm)) {
+            // Use as initial display name; user can toggle later (display-only).
+            displayTonicOverride = res.displayName;
+          } else {
+            displayTonicOverride = null;
+          }
         } else {
           console.warn('[randomBtn] no candidate found (res null)');
           document.getElementById('titleValue').textContent = '— (no tunes found)';
