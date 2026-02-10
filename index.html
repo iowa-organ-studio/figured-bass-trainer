@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer6.3</title>
+<title>Figured Bass Trainer6.31</title>
 
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
@@ -521,54 +521,38 @@ vrvToolkit.setOptions(baseOptions);
       return { letter, acc, pc };
     }
 
+     // old: function accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc) { ... }
+    // REPLACEMENT: compute accidental relative to the *diatonic* pitch (not natural),
+    // but still emit 'n' when the desired pitch equals the letter's natural pitch while the diatonic differs.
     function accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc) {
-      const diffNat = (desiredPc - naturalPc + 12) % 12;
-      if (diffNat === 0) {
-        if (diatonicPc !== naturalPc) return 'n';
+      // Normalize to 0..11
+      desiredPc = ((desiredPc % 12) + 12) % 12;
+      naturalPc = ((naturalPc % 12) + 12) % 12;
+      diatonicPc = ((diatonicPc % 12) + 12) % 12;
+
+      // If desired equals diatonic, no accidental needed.
+      if (desiredPc === diatonicPc) {
         return '';
       }
-      if (diffNat === 1) return '#';
-      if (diffNat === 11) return 'b';
-      if (diffNat === 2) return '##';
-      if (diffNat === 10) return 'bb';
+
+      // If desired equals the letter's natural pitch but diatonic is different, we need explicit 'n'.
+      if (desiredPc === naturalPc && diatonicPc !== naturalPc) {
+        return 'n';
+      }
+
+      // Determine minimal signed difference relative to the DIATONIC pitch (preferred reference).
+      let diff = (desiredPc - diatonicPc + 12) % 12;
+      if (diff > 6) diff -= 12; // now in -6..+6
+
+      if (diff === 1) return '#';
+      if (diff === -1) return 'b';
+      if (diff === 2) return '##';
+      if (diff === -2) return 'bb';
+
+      // If we get here, it's an unusual gap (>=3 semitones): return null to avoid guessing.
       return null;
     }
 
-    /* -------------------- diatonic map (mode aware) -------------------- */
-    const LETTERS = ['C','D','E','F','G','A','B'];
-    const SCALE_OFFSETS_MAJOR = [0,2,4,5,7,9,11];
-    const SCALE_OFFSETS_NAT_MINOR = [0,2,3,5,7,8,10];
-
-    function findScaleMapFor(semitonesOffset) {
-      if (typeof originalKeyIndex !== 'number' || originalKeyIndex === null) return null;
-      const targetKeyIndex = (originalKeyIndex + semitonesOffset + 120) % 12;
-      const tonicName = indexToTonic(targetKeyIndex, originalAccidentalPref) || 'C';
-      const tonicLetter = tonicName[0].toUpperCase();
-      const OFFSETS = originalIsMajor ? SCALE_OFFSETS_MAJOR : SCALE_OFFSETS_NAT_MINOR;
-      const tonicLetterIdx = LETTERS.indexOf(tonicLetter);
-
-      const map = {};
-      for (let d = 0; d < 7; d++) {
-        const letter = LETTERS[(tonicLetterIdx + d) % 7];
-        const pc = (targetKeyIndex + OFFSETS[d]) % 12;
-        map[letter] = pc;
-      }
-      return map;
-    }
-
-    function parseKeyInterpretation(hum) {
-      const lines = hum.split(/\r?\n/);
-      for (let ln of lines) {
-        ln = ln.trim();
-        const m = ln.match(/^\*([A-Ga-g])([#b♯♭-]?)\s*:/);
-        if (m) {
-          let acc = m[2] || '';
-          if (acc === '-') acc = 'b';
-          return { letter: m[1], accidental: acc };
-        }
-      }
-      return null;
-    }
 
     /* -------------------- prepareFiguredBassForTranspose -------------------- */
     function prepareFiguredBassForTranspose(humText, semitones) {
@@ -1682,3 +1666,4 @@ async function pickRandomTuneAndTranspose() {
   </script>
 </body>
 </html>
+
