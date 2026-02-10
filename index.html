@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer5-4 (patched)</title>
-
+  <title>Figured Bass Trainer 5-41</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
+  <!-- These scripts should be present in the same folder or adjusted to your hosting paths -->
   <script src="verovio-toolkit-wasm.js"></script>
   <script src="verovio-toolkit-hum.js"></script>
 
@@ -57,37 +57,6 @@
   .hum-panel{ margin-top:8px; background:#0f1724; color:#e6eef8; font-family:monospace; font-size:0.86rem; border-radius:10px; overflow:auto; border:1px solid #22303b; }
   .hum-panel pre{ margin:0; padding:10px; white-space:pre-wrap; word-break:break-word; }
   .hum-panel summary{ padding:8px 12px; cursor:pointer; font-weight:600; }
-
-  .collection-card{ display:inline-flex; gap:8px; align-items:center; padding:6px 10px; border-radius:10px; border:1px solid var(--border); background:#fff; }
-  #row4 { display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; align-items:flex-start; }
-
-  .chip .label{ font-size:0.88rem; color:var(--muted); }
-  .chip .value{ font-weight:600; margin-left:6px; font-size:0.95rem; }
-
-  #figPlacementCard, .conventions-card { width:360px; min-width:260px; margin:8px 10px 0 0; padding:6px; display:inline-block; vertical-align:top; }
-  #figPlacementCard fieldset, .conventions-card fieldset { border:0;margin:0;padding:0; }
-  #figPlacementCard legend, .conventions-card legend { font-weight:600; margin-bottom:6px; font-size:0.92rem; }
-  .placement-row{ display:flex; gap:14px; align-items:center; justify-content:flex-start; }
-  .placement-row label, .conventions-row label {
-    display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:8px; border:1px solid var(--border);
-    cursor:pointer; background:#fafafa; font-size:.90rem; line-height:1;
-  }
-
-  .cpe-card { display:inline-block; vertical-align:top; width:180px; min-width:160px; margin:8px 10px 0 0; padding:8px; }
-  .small-filter-card { display:inline-block; vertical-align:top; width:240px; min-width:220px; margin:8px 10px 0 0; padding:8px; }
-
-  .row-equal-height { display:flex; gap:12px; align-items:stretch; flex-wrap:wrap; }
-  .row-equal-height .card { display:flex; flex-direction:column; justify-content:flex-start; }
-
-  .asc-desc-controls, .major-minor-controls { display:flex; gap:8px; }
-  .asc-desc-btn, .major-minor-btn { padding:8px 12px; border-radius:10px; background:#f3f3f8; border:1px solid var(--border); cursor:pointer; }
-  .asc-desc-btn.active, .major-minor-btn.active { background:var(--butter); border:1px solid var(--butter-border); box-shadow:0 2px 0 rgba(230,212,138,.6); }
-
-  .som-logo { display:block; max-width:720px; margin:18px auto 12px auto; opacity:0.98; }
-
-  input[type="radio"], input[type="checkbox"] { accent-color: var(--gold); }
-
-  .boldLabel { font-weight:600; }
   </style>
 </head>
 <body>
@@ -187,70 +156,6 @@
         <button id="octUpBtn" class="miniBtn btn-lite" type="button">+</button>
       </div>
     </div>
-  </div>
-
-  <div class="row-equal-height" style="margin-top:12px;">
-    <div class="card cpe-card">
-      <div class="boldLabel">CPE Bach</div>
-      <div style="height:6px"></div>
-      <div class="major-minor-controls">
-        <button id="filterMajorBtn" class="major-minor-btn active" type="button">Major</button>
-        <button id="filterMinorBtn" class="major-minor-btn active" type="button">Minor</button>
-      </div>
-    </div>
-
-    <div class="card small-filter-card">
-      <div class="boldLabel">Direction</div>
-      <div style="height:6px"></div>
-      <div class="asc-desc-controls">
-        <button id="filterAscBtn" class="asc-desc-btn active" type="button">Ascending</button>
-        <button id="filterDescBtn" class="asc-desc-btn active" type="button">Descending</button>
-      </div>
-    </div>
-
-    <div class="card small-filter-card" id="maxDifficultyCard">
-      <div class="boldLabel">Max difficulty</div>
-      <div style="height:6px"></div>
-      <div class="sliderHeader" style="margin-top:6px;">
-        <div></div>
-        <div style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <button id="maxMinusBtn" class="miniBtn btn-lite" type="button" title="Decrease max difficulty">–</button>
-          <button id="maxPlusBtn" class="miniBtn btn-lite" type="button" title="Increase max difficulty">+</button>
-          <span id="maxBadge" class="badge">7</span>
-        </div>
-      </div>
-      <input id="maxRange" type="range" min="1" max="7" step="1" value="7" />
-    </div>
-  </div>
-
-  <details id="filtersCard" open style="margin-top:12px;">
-    <summary>Filters</summary>
-    <div id="optionsBar">
-      <fieldset class="panel" id="exPanel">
-        <legend>
-          <span>Exclude</span>
-          <span class="panel-tools">
-            <button class="tool-btn" type="button" id="exAllBtn">select all</button>
-            <button class="tool-btn" type="button" id="exNoneBtn">select none</button>
-          </span>
-        </legend>
-        <div class="row" id="exRow" style="padding:8px 6px;"></div>
-      </fieldset>
-    </div>
-  </details>
-
-  <div style="margin-top:8px;">
-    <div class="collection-card card">
-      <div style="font-weight:600">My Collection</div>
-      <div style="width:12px"></div>
-      <div style="color:var(--muted); font-size:.92rem">(custom collection editor coming)</div>
-      <div style="flex:1"></div>
-      <button id="manageCollectionBtn" class="miniBtn btn-lite" type="button">Manage</button>
-    </div>
-  </div>
-
-  <div style="padding:16px 0 8px 0; text-align:center;">
-    <img src="School-of-Music-LockupStacked-RGB.svg" alt="School of Music" class="som-logo" />
   </div>
 
   <details class="hum-panel" id="humPanelWrap" open style="margin:10px 16px 40px 16px;">
@@ -354,44 +259,32 @@
     }
 
     /* -------------------- robust asset helpers -------------------- */
-    // Build a relative path that works for GitHub Pages (keeps repo base path)
     function normalizeTunePath(entry) {
       if (!entry) return '';
       let e = String(entry);
       e = e.replace(/^"+|"+$/g,''); // trim stray quotes if any
       e = e.replace(/^\/+/, ''); // drop leading slash
-      // If tune.json entries use 'tunes/...' already, keep it, otherwise prepend 'tunes/'
       if (!/^tunes\//i.test(e) && !/^tunes\.json$/i.test(e)) e = 'tunes/' + e;
       return e;
     }
 
     function buildRelativeForAsset(pathSegment) {
-      // compute directory of current document (keeps repo path for GitHub Pages)
       const baseDir = (window.location.pathname.endsWith('/'))
         ? window.location.pathname
         : window.location.pathname.replace(/\/[^/]*$/, '/');
-      // join and dedupe slashes, but leave leading slash (so browser will request same origin + path)
-      // We purposely avoid a domain (origin) so fetch uses same origin, same branch root
       let p = baseDir + pathSegment;
       p = p.replace(/\/{2,}/g, '/');
-      // If the site is hosted at domain root, leading slash is fine; if hosted under /repo/, baseDir includes /repo/
       return p;
     }
 
-    // fetch helper: logs and uses encodeURI (so slashes remain)
     async function fetchAsset(entry) {
       const rel = normalizeTunePath(entry);
       const urlPath = buildRelativeForAsset(rel);
-      console.log('[fetchAsset] trying', { entry, rel, urlPath });
       try {
         const resp = await fetch(encodeURI(urlPath), { cache: 'no-cache' });
-        if (!resp || !resp.ok) {
-          console.warn('[fetchAsset] fetch failed', resp && resp.status, urlPath);
-          return null;
-        }
+        if (!resp || !resp.ok) return null;
         return resp;
       } catch (e) {
-        console.error('[fetchAsset] error', e, urlPath);
         return null;
       }
     }
@@ -400,34 +293,25 @@
     async function loadRandomTuneToHumData() {
       try {
         const tunesJsonPath = buildRelativeForAsset('tunes.json?_=' + Date.now());
-        console.log('[loadRandomTuneToHumData] requesting', tunesJsonPath);
         let listResp;
         try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); }
-        catch (e) { console.error('[loadRandomTuneToHumData] fetch failed', e); return null; }
-        if (!listResp || !listResp.ok) {
-          console.warn('[loadRandomTuneToHumData] tunes.json missing', listResp && listResp.status);
-          return null;
-        }
+        catch (e) { return null; }
+        if (!listResp || !listResp.ok) return null;
         const listJson = await listResp.json();
-        console.log('[loadRandomTuneToHumData] tunes.json content', listJson);
 
         let files = [];
         if (Array.isArray(listJson)) files = listJson.slice();
         else if (Array.isArray(listJson.files)) files = listJson.files.slice();
-        else {
-          console.warn('[loadRandomTuneToHumData] tunes.json has unexpected shape');
-          return null;
-        }
-        if (!files.length) { console.warn('[loadRandomTuneToHumData] tunes.json empty'); return null; }
+        else return null;
+
+        if (!files.length) return null;
         const pick = files[Math.floor(Math.random() * files.length)];
-        console.log('[loadRandomTuneToHumData] picked', pick);
 
         const fileResp = await fetchAsset(pick);
-        if (!fileResp) { console.warn('[loadRandomTuneToHumData] file fetch failed'); return null; }
+        if (!fileResp) return null;
         const text = await fileResp.text();
         return { filename: pick, text };
       } catch (e) {
-        console.error('[loadRandomTuneToHumData] unexpected error', e);
         return null;
       }
     }
@@ -452,36 +336,34 @@
     } catch (e) { console.warn(e); }
 
     /* -------------------- verovio & base options -------------------- */
-if (!(window.verovio && typeof verovio.toolkit === 'function')) {
-  document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths: verovio-toolkit-wasm.js and verovio-toolkit-hum.js';
-  document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)');
-  return;
-}
+    if (!(window.verovio && typeof verovio.toolkit === 'function')) {
+      document.getElementById('svg').textContent = 'Verovio not loaded. Check script paths: verovio-toolkit-wasm.js and verovio-toolkit-hum.js';
+      document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)');
+      return;
+    }
 
-// instantiate verovio toolkit
-const vrvToolkit = new verovio.toolkit();
+    const vrvToolkit = new verovio.toolkit();
 
-const baseOptions = {
-  scale: 50, pageWidth: 900, adjustPageHeight: true,
-  spacingLinear: 0.50,
-  spacingNonLinear: 0.50 * (0.46 / 0.32), // preserve ratio
-  spacingSystem: 10, spacingStaff: 8
-};
-vrvToolkit.setOptions(baseOptions);
+    const baseOptions = {
+      scale: 50, pageWidth: 900, adjustPageHeight: true,
+      spacingLinear: 0.50,
+      spacingNonLinear: 0.50 * (0.46 / 0.32),
+      spacingSystem: 10, spacingStaff: 8
+    };
+    vrvToolkit.setOptions(baseOptions);
 
 
     /* -------------------- state -------------------- */
     let figuresAbove = false;
     let conventionsMode = 'historic';
-    let currentSemitones = 0; // -6..+6 preferred
-    let octaveShift = 0;      // integer, each = ±12 semitones displayed with prefix +/- 
+    let currentSemitones = 0;
+    let octaveShift = 0;
     let currentScale = baseOptions.scale;
     let currentSpacingLinear = baseOptions.spacingLinear;
     let originalKeyIndex = null;
     let originalIsMajor = true;
     let originalAccidentalPref = '';
 
-    // filters
     let maxDifficulty = 7;
     let filterAscending = true;
     let filterDescending = true;
@@ -491,9 +373,9 @@ vrvToolkit.setOptions(baseOptions);
     /* -------------------- figures helpers & parsing -------------------- */
     function normalizeAccRaw(acc) {
       if (!acc) return '';
-      acc = acc.replace(/\s+/g, '');
-      acc = acc.replace(/-/g, 'b');
-      acc = acc.replace(/[\/\\]/g, '#');
+      acc = acc.replace(/\s+/g,'');
+      acc = acc.replace(/-/g,'b');
+      acc = acc.replace(/[\/\\]/g,'#');
       return acc;
     }
     function toHumdrumAcc(acc) {
@@ -534,7 +416,6 @@ vrvToolkit.setOptions(baseOptions);
       return null;
     }
 
-    /* -------------------- diatonic map (mode aware) -------------------- */
     const LETTERS = ['C','D','E','F','G','A','B'];
     const SCALE_OFFSETS_MAJOR = [0,2,4,5,7,9,11];
     const SCALE_OFFSETS_NAT_MINOR = [0,2,3,5,7,8,10];
@@ -576,12 +457,11 @@ vrvToolkit.setOptions(baseOptions);
 
       const lines = humText.split(/\r?\n/);
 
-      // --------- discover spines (kern, fb, 3rd=actual, 4th=force-diatonic) ----------
       let headerBlockEnd = -1;
       let kernIndices = [];
       let fbIndex = null;
-      let actualTextIndex = null;  // 3rd spine
-      let forceTextIndex  = null;  // 4th spine
+      let actualTextIndex = null;
+      let forceTextIndex  = null;
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -591,12 +471,10 @@ vrvToolkit.setOptions(baseOptions);
         if (toks.some(t => String(t).startsWith('**'))) {
           headerBlockEnd = i;
 
-          // first/any **kern indices (we'll use the 1st as bass reference)
           for (let c = 0; c < toks.length; c++) {
             if (String(toks[c]).startsWith('**kern')) kernIndices.push(c);
           }
 
-          // first **fb-like index
           for (let c = 0; c < toks.length; c++) {
             const t = String(toks[c]);
             if (t.startsWith('**fb') || t.startsWith('**fba') || t.startsWith('**fbb')) {
@@ -604,7 +482,6 @@ vrvToolkit.setOptions(baseOptions);
             }
           }
 
-          // 3rd and 4th spines: first and second **text after **fb
           if (fbIndex !== null) {
             let foundFirst = false;
             for (let c = fbIndex + 1; c < toks.length; c++) {
@@ -625,7 +502,6 @@ vrvToolkit.setOptions(baseOptions);
       const preHeaderLines = lines.slice(0, headerBlockEnd + 1);
       const restLines      = lines.slice(headerBlockEnd + 1);
 
-      // --------- global max numerals for alignment (from original fb column) ----------
       let globalMax = 0;
       for (const line of restLines) {
         if (!line) continue;
@@ -642,7 +518,6 @@ vrvToolkit.setOptions(baseOptions);
         globalMax = Math.max(globalMax, numeralsCount);
       }
 
-      // --------- target key map (major / natural minor) ----------
       const scalePCByLetter = findScaleMapFor(semitones);
       const scaleLettersByPc = scalePCByLetter
         ? Object.keys(scalePCByLetter).reduce((acc, L) => {
@@ -653,20 +528,11 @@ vrvToolkit.setOptions(baseOptions);
           }, {})
         : null;
 
-      // ===== Helpers (5a–5c logic) =====
-
       function pcNewBass(bassInfo) {
-        // Keep newBassPc as the sounding pitch class only (for playback/transpose purposes).
         return (bassInfo.pc + semitones + 120) % 12;
       }
 
-      /**
-       * Prefer stepping diatonically from the *spelled* bass letter when available.
-       * This implements the algorithm you described: count diatonic steps from spelled bass,
-       * then apply the same semitone alteration (direction) as the original figure.
-       */
       function targetLetterForDegree(newBassPc, degree, bassLetterSpelled) {
-        // Prefer letter-stepping from spelled bass if provided
         if (bassLetterSpelled && typeof bassLetterSpelled === 'string') {
           const LETTERS7 = ['C','D','E','F','G','A','B'];
           const startIdx = LETTERS7.indexOf(bassLetterSpelled.toUpperCase());
@@ -675,7 +541,6 @@ vrvToolkit.setOptions(baseOptions);
           }
         }
 
-        // Fallback: find a letter in the target key whose diatonic pc matches newBassPc
         if (!scalePCByLetter || !scaleLettersByPc) return null;
 
         let bassLetterInTargetKey = null;
@@ -689,15 +554,12 @@ vrvToolkit.setOptions(baseOptions);
         return LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
       }
 
-      // PRINT ACCIDENTAL RELATIVE TO THE NATURAL LETTER (Step 6)
       function accidentalForDirection(targetLetter, direction) {
         if (!targetLetter || !scalePCByLetter) return null;
         const diatonicPc = scalePCByLetter[targetLetter];
         const naturalPc  = LETTER_TO_INDEX[targetLetter];
         let desiredPc    = diatonicPc;
 
-        // direction is *the original figure's alteration*, so interpret it relative to the
-        // diatonic (scale) note in the target key.
         if (direction === '#' || /#[♯]/.test(direction)) desiredPc = (diatonicPc + 1) % 12;
         else if (direction === 'b' || /b/.test(direction)) desiredPc = (diatonicPc + 11) % 12;
         else if (direction === '##') desiredPc = (diatonicPc + 2) % 12;
@@ -705,12 +567,10 @@ vrvToolkit.setOptions(baseOptions);
         else if (/n/i.test(direction)) desiredPc = naturalPc;
         else desiredPc = diatonicPc;
 
-        // Now compute the accidental needed relative to the *natural letter*.
         const finalAccSym = accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc);
-        return finalAccSym; // '', 'n', '#', 'b', '##', 'bb', or null
+        return finalAccSym;
       }
 
-      // 4th spine: courtesy accidental for the *diatonic* pitch itself (always explicit)
       function accidentalForDiatonic(targetLetter) {
         if (!targetLetter || !scalePCByLetter) return null;
         const diatonicPc = scalePCByLetter[targetLetter];
@@ -735,8 +595,6 @@ vrvToolkit.setOptions(baseOptions);
         const mAccOnly = s.match(/^([#♯b♭nN\-\/\\]+)$/);
         if (mAccOnly) {
           const accRaw = normalizeAccRaw(mAccOnly[1] || '');
-          // acc-only historically points to the 3rd degree in many sources; we preserve that
-          // behaviour but treat the accidental as a direction (not a pitch to be transposed).
           return { degree: 3, acc: accRaw, accOnly: true, raw: s };
         }
         return null;
@@ -755,17 +613,15 @@ vrvToolkit.setOptions(baseOptions);
         return (
           fullToken === '5-' ||
           fullToken === '4#|' ||
-          /[\\\/]$/.test(fullToken) // slashed endings
+          /[\\\/]$/.test(fullToken)
         );
       }
-
-      // ===== per-part processors =====
 
       function processFbPartHistorical(partRaw, kernTok) {
         if (!partRaw || /^[\*\=\!\|]/.test(partRaw) || partRaw === '.') return partRaw;
 
         const fullToken = String(partRaw);
-        if (isHistoricalPassThroughToken(fullToken)) return fullToken;  // D1
+        if (isHistoricalPassThroughToken(fullToken)) return fullToken;
 
         let trailingBar = '';
         let part = fullToken;
@@ -777,17 +633,15 @@ vrvToolkit.setOptions(baseOptions);
         if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
 
         const bassInfo = parseKernPitch(kernTok);
-        // IMPORTANT: use spelled bass letter for interval calculations.
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-        const newBassPc    = pcNewBass(bassInfo); // for sounding only
+        const newBassPc    = pcNewBass(bassInfo);
         const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
         if (!targetLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
 
-        // Apply the *directional* alteration from the original figure to the newly computed diatonic note.
         const finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
         if (finalAccSym === null) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
@@ -807,16 +661,14 @@ vrvToolkit.setOptions(baseOptions);
         const parsed = parseFigurePart(part);
         if (!parsed) return partFromActualSpine;
 
-        // Numeral with NO accidental: keep numeral unchanged (no chromatic info to carry)
         if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
 
         const bassInfo = parseKernPitch(kernTok);
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
-          // No context – preserve literal (normalize to humdrum)
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
 
-        const newBassPc    = pcNewBass(bassInfo); // sound-only
+        const newBassPc    = pcNewBass(bassInfo);
         const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
         if (!targetLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
@@ -827,7 +679,6 @@ vrvToolkit.setOptions(baseOptions);
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
 
-        // --- preserve explicit natural from Actual (3rd spine) ---
         if (finalAccSym === '' && /n/i.test(parsed.acc)) {
           finalAccSym = 'n';
         }
@@ -849,20 +700,18 @@ vrvToolkit.setOptions(baseOptions);
 
         const bassInfo = parseKernPitch(kernTok);
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
-          return String(parsed.degree) + 'n' + trailingBar; // safest courtesy
+          return String(parsed.degree) + 'n' + trailingBar;
         }
-        const newBassPc    = pcNewBass(bassInfo); // sound-only
+        const newBassPc    = pcNewBass(bassInfo);
         const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
         if (!targetLetter) {
           return String(parsed.degree) + 'n' + trailingBar;
         }
 
-        const diatonicAcc = accidentalForDiatonic(targetLetter); // '#','b','n','##','bb'
+        const diatonicAcc = accidentalForDiatonic(targetLetter);
         const outAcc = diatonicAcc || 'n';
         return String(parsed.degree) + toHumdrumAcc(outAcc) + trailingBar;
       }
-
-      // ===== process body lines =====
 
       let lastKernTokForBass = null;
 
@@ -871,7 +720,6 @@ vrvToolkit.setOptions(baseOptions);
         const useTabs = line.indexOf('\t') !== -1;
         const toks = useTabs ? line.split('\t') : line.split(/\s+/);
 
-        // handle header-like lines inside body
         if (toks.some(t => String(t).startsWith('**'))) {
           return useTabs ? toks.join('\t') : toks.join(' ');
         }
@@ -884,7 +732,6 @@ vrvToolkit.setOptions(baseOptions);
         );
         while (toks.length <= maxIdxToEnsure) toks.push('.');
 
-        // carry-forward bass
         const kernTokRaw = (kernIndices && kernIndices.length) ? toks[kernIndices[0]] : null;
         const parsedBassNow = parseKernPitch(kernTokRaw);
         if (parsedBassNow && typeof parsedBassNow.pc === 'number') {
@@ -894,7 +741,6 @@ vrvToolkit.setOptions(baseOptions);
           ? kernTokRaw
           : lastKernTokForBass;
 
-        // pick sources with precedence: 4th (always) > 3rd (if Actual) > 2nd
         const fbTokSrc  = toks[fbIndex];
         const forceTok  = (forceTextIndex  != null) ? toks[forceTextIndex] : null;
         const actualTok = (conventionsMode === 'modern' && actualTextIndex != null) ? toks[actualTextIndex] : null;
@@ -923,10 +769,9 @@ vrvToolkit.setOptions(baseOptions);
             : processedParts.join(' ');
         }
 
-        // NEUTRALIZE helper spines on DATA rows only (preserve * / = / ! / |)
         function neutralizeHelperToken(tok) {
           if (!tok) return '.';
-          if (/^[\*\=\!|]/.test(tok)) return tok; // keep interpretations, barlines, comments, '|' separators
+          if (/^[\*\=\!|]/.test(tok)) return tok;
           return '.';
         }
         if (actualTextIndex != null) toks[actualTextIndex] = neutralizeHelperToken(toks[actualTextIndex]);
@@ -935,13 +780,11 @@ vrvToolkit.setOptions(baseOptions);
         return useTabs ? toks.join('\t') : toks.join(' ');
       });
 
-      // header rewrite (figures-above + neutralize helper spine headers)
       const processedHeader = preHeaderLines.map(hl => {
         if (!hl) return hl;
         const useTabs = hl.indexOf('\t') !== -1;
         const toks = useTabs ? hl.split('\t') : hl.split(/\s+/);
 
-        // Convert **fb -> **fba only if figuresAbove
         if (figuresAbove) {
           for (let c = 0; c < toks.length; c++) {
             if (String(toks[c]).startsWith('**fb') && !String(toks[c]).startsWith('**fba')) {
@@ -949,7 +792,6 @@ vrvToolkit.setOptions(baseOptions);
             }
           }
         }
-        // Neutralize **text headers for helper spines
         for (let c = 0; c < toks.length; c++) {
           if (actualTextIndex != null && c === actualTextIndex && String(toks[c]).startsWith('**text')) {
             toks[c] = '**text-hidden';
@@ -976,7 +818,6 @@ vrvToolkit.setOptions(baseOptions);
     function renderWithTranspose() {
       const humPanelEl = document.getElementById('humPanel');
 
-      // Always run the preparation pass so 4th spine can override even with 0 transpose
       const preparedHum = prepareFiguredBassForTranspose(humData || "", currentSemitones);
 
       const semText = String(currentSemitones || 0);
@@ -991,52 +832,41 @@ vrvToolkit.setOptions(baseOptions);
       ].join('\n\n');
       if (humPanelEl) humPanelEl.textContent = panelContent;
 
-    // spacing-aware options: use viewer width if available, guard missing base values, cap extremes
-const baseLinear = baseOptions.spacingLinear || 0.32;
-const spacingNonLinearRatio =
-  (baseOptions.spacingNonLinear && baseOptions.spacingLinear)
-    ? baseOptions.spacingNonLinear / baseOptions.spacingLinear
-    : 1;
+      const baseLinear = baseOptions.spacingLinear || 0.32;
+      const spacingNonLinearRatio =
+        (baseOptions.spacingNonLinear && baseOptions.spacingLinear)
+          ? baseOptions.spacingNonLinear / baseOptions.spacingLinear
+          : 1;
 
-const scaleFactor = currentSpacingLinear / baseLinear;
+      const scaleFactor = currentSpacingLinear / baseLinear;
 
-// give Verovio more horizontal room as spacing grows
-const pageWidth =
-  Math.round(baseOptions.pageWidth * Math.max(1, scaleFactor * 1.5));
+      const pageWidth =
+        Math.round(baseOptions.pageWidth * Math.max(1, scaleFactor * 1.5));
 
-const options = {
-  ...baseOptions,
-  scale: currentScale,
-  spacingLinear: currentSpacingLinear,
-  spacingNonLinear: currentSpacingLinear * spacingNonLinearRatio,
-  pageWidth
-};
+      const options = {
+        ...baseOptions,
+        scale: currentScale,
+        spacingLinear: currentSpacingLinear,
+        spacingNonLinear: currentSpacingLinear * spacingNonLinearRatio,
+        pageWidth
+      };
 
-
-           // Choose a suitable transpose option for Verovio.
-      // If we know the original key (originalKeyIndex), request transposition by target tonic (keeps key-based spellings).
-      // Otherwise request chromatic semitone transposition (integer), which works even if input lacks key info.
       let transposeOption = "";
       if (originalKeyIndex !== null) {
         const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
         const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
         const prefix = octaveShift > 0 ? "+".repeat(octaveShift) : octaveShift < 0 ? "-".repeat(-octaveShift) : "";
-        // Example: "+Gb" or "C"
         transposeOption = prefix + (tonicRaw || "");
       } else {
-        // When no key info is available in the input, fall back to semitone transposition.
-        // Verovio accepts an integer string (e.g. "1", "-1") to mean chromatic semitone steps.
         if (currentSemitones !== 0 || octaveShift !== 0) {
-          // include octaveShift as additional 12-semitone steps:
           const totalSemitones = currentSemitones + (octaveShift * 12);
           transposeOption = String(totalSemitones);
         } else {
-          transposeOption = ""; // no transpose
+          transposeOption = "";
         }
       }
       options.transpose = transposeOption;
 
-      // Status text for the UI:
       if (originalKeyIndex !== null) {
         const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
         const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
@@ -1057,14 +887,13 @@ const options = {
         }
       }
 
-
       vrvToolkit.setOptions(options);
       try {
         const svg = vrvToolkit.renderData(preparedHum, {});
         document.getElementById('svg').innerHTML = svg;
         document.getElementById('scaleBadge').textContent = String(currentScale);
         document.getElementById('spacingBadge').textContent = currentSpacingLinear.toFixed(2);
-        document.getElementById('maxBadge').textContent = String(maxDifficulty);
+        document.getElementById('maxBadge') && (document.getElementById('maxBadge').textContent = String(maxDifficulty));
       } catch (e) {
         document.getElementById('svg').textContent = "Render error: " + (e && e.message ? e.message : String(e));
         console.error(e);
@@ -1076,7 +905,6 @@ const options = {
     document.getElementById('halfDownBtn').addEventListener('click', ()=>{ currentSemitones -= 1; displayTonicOverride = null; renderWithTranspose(); });
     document.getElementById('enharmonicBtn').addEventListener('click', ()=>{ toggleEnharmonicDisplay(); });
 
-    // Octave buttons: immediate +/-12 semitones
     document.getElementById('octUpBtn').addEventListener('click', ()=>{ octaveShift += 1; renderWithTranspose(); });
     document.getElementById('octDownBtn').addEventListener('click', ()=>{ octaveShift -= 1; renderWithTranspose(); });
 
@@ -1089,13 +917,11 @@ const options = {
     document.getElementById('scaleSlider').addEventListener('input', (e)=>{ currentScale = clamp(Number(e.target.value),30,200); renderWithTranspose(); });
     document.getElementById('spacingSlider').addEventListener('input', (e)=>{ currentSpacingLinear = clamp(Number(e.target.value),0.20,0.99); renderWithTranspose(); });
 
-    // Accidentals radios
     const convHist = document.getElementById('conv_historic');
     const convMod = document.getElementById('conv_modern');
     if (convHist) convHist.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'historic'; renderWithTranspose(); }});
     if (convMod) convMod.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'modern'; renderWithTranspose(); }});
 
-    // Figured-bass placement radio
     const rbBelow = document.getElementById('figBelow');
     const rbAbove = document.getElementById('figAbove');
     if (rbBelow) rbBelow.addEventListener('change', (e)=>{ if (e.target.checked){ figuresAbove = false; renderWithTranspose(); }});
@@ -1131,8 +957,8 @@ const options = {
       });
     }
 
-    document.getElementById('exAllBtn').addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=true); });
-    document.getElementById('exNoneBtn').addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=false); });
+    document.getElementById('exAllBtn')?.addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=true); });
+    document.getElementById('exNoneBtn')?.addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=false); });
 
     function getExcludedTonicsSet() {
       const s = new Set();
@@ -1145,27 +971,26 @@ const options = {
     /* -------------------- initial setup & render -------------------- */
     addAccidentalRangeButtons("keysRangeRowTop","keysRangeRowBottom");
     addExcludeCheckboxes("exRow", excludeTonics);
-   /* document.getElementById('titleValue').textContent = filename || '—'; */
 
     /* -------------------- Asc/Desc, Major/Minor, Max difficulty -------------------- */
     const ascBtn = document.getElementById('filterAscBtn');
     const descBtn = document.getElementById('filterDescBtn');
-    ascBtn.addEventListener('click', ()=>{ filterAscending = !filterAscending; ascBtn.classList.toggle('active', filterAscending); });
-    descBtn.addEventListener('click', ()=>{ filterDescending = !filterDescending; descBtn.classList.toggle('active', filterDescending); });
+    ascBtn?.addEventListener('click', ()=>{ filterAscending = !filterAscending; ascBtn.classList.toggle('active', filterAscending); });
+    descBtn?.addEventListener('click', ()=>{ filterDescending = !filterDescending; descBtn.classList.toggle('active', filterDescending); });
 
     const majorBtn = document.getElementById('filterMajorBtn');
     const minorBtn = document.getElementById('filterMinorBtn');
-    majorBtn.addEventListener('click', ()=>{ filterMajor = !filterMajor; majorBtn.classList.toggle('active', filterMajor); });
-    minorBtn.addEventListener('click', ()=>{ filterMinor = !filterMinor; minorBtn.classList.toggle('active', filterMinor); });
+    majorBtn?.addEventListener('click', ()=>{ filterMajor = !filterMajor; majorBtn.classList.toggle('active', filterMajor); });
+    minorBtn?.addEventListener('click', ()=>{ filterMinor = !filterMinor; minorBtn.classList.toggle('active', filterMinor); });
 
     const maxMinusBtn = document.getElementById('maxMinusBtn');
     const maxPlusBtn = document.getElementById('maxPlusBtn');
     const maxBadge = document.getElementById('maxBadge');
     const maxRange = document.getElementById('maxRange');
-    function setMaxDifficulty(v) { maxDifficulty = clamp(Number(v),1,7); maxBadge.textContent = String(maxDifficulty); maxRange.value = String(maxDifficulty); }
-    maxMinusBtn.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty - 1));
-    maxPlusBtn.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty + 1));
-    maxRange.addEventListener('input', (e)=> setMaxDifficulty(e.target.value));
+    function setMaxDifficulty(v) { maxDifficulty = clamp(Number(v),1,7); maxBadge && (maxBadge.textContent = String(maxDifficulty)); if (maxRange) maxRange.value = String(maxDifficulty); }
+    maxMinusBtn?.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty - 1));
+    maxPlusBtn?.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty + 1));
+    maxRange?.addEventListener('input', (e)=> setMaxDifficulty(e.target.value));
     setMaxDifficulty(7);
 
     /* -------------------- Candidate selection logic (7#/7b handled) -------------------- */
@@ -1191,7 +1016,6 @@ const options = {
       'A#': 7, 'G#': 6, 'D#': 3
     };
 
-    // Strict: collect counts for index
     function countsForIndexCandidates(idx) {
       const cand = SAFE_TONICS_MAJOR[idx] || [];
       const counts = new Set();
@@ -1202,35 +1026,92 @@ const options = {
       return Array.from(counts);
     }
 
-    /**
-     * Pick a display name for the given index.
-     * - preferredCounts is a Set of accidental counts the user has selected (e.g. {7})
-     * - If any spellings match preferredCounts, pick randomly among those.
-     * - Otherwise, pick randomly among spellings whose accidental-count <= 7.
-     * - If none of the spellings have a known accidental-count, fall back to a canonical name.
-     */
     function pickDisplayNameForIndexByAccCount(idx, preferredCounts /* Set */) {
       const names = SAFE_TONICS_MAJOR[idx] || [];
-      // collect spellings with known counts
       const withCount = names.map(n => {
         const norm = tonicNameNormalized(n);
         const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
         return { raw: n, norm, cnt };
       });
 
-      // 1) prefer spellings that match the user's selected buckets
       const preferred = withCount.filter(x => x.cnt !== null && preferredCounts.has(x.cnt)).map(x => x.raw);
       if (preferred.length) return preferred[Math.floor(Math.random() * preferred.length)];
 
-      // 2) otherwise use any spelling that is not "theoretical" (>7 accidentals)
       const nonTheoretical = withCount.filter(x => x.cnt !== null && x.cnt <= 7).map(x => x.raw);
       if (nonTheoretical.length) return nonTheoretical[Math.floor(Math.random() * nonTheoretical.length)];
 
-      // 3) fallback: return any name (maybe unknown) or indexToTonic
       if (names.length) return names[Math.floor(Math.random() * names.length)];
       return indexToTonic(idx, '');
     }
-...
+
+    /* -------------------- small extraction to set originalKeyIndex etc. -------------------- */
+    function deriveOriginalKeyFromHum() {
+      originalKeyIndex = null;
+      originalIsMajor = true;
+      originalAccidentalPref = '';
+      enharmonicCycleList = null;
+
+      if (!humData) return;
+
+      const keyInterp = parseKeyInterpretation(humData);
+      if (keyInterp && keyInterp.letter) {
+        const idx = keyToIndex(keyInterp.letter, keyInterp.accidental || '');
+        if (idx !== null) {
+          originalKeyIndex = idx;
+          originalAccidentalPref = keyInterp.accidental || '';
+          // detect minor via common markers: look for "*MM" or text? As fallback, check presence of "mode: minor" meta
+          originalIsMajor = !/mode:\s*minor/i.test(humData);
+        }
+      } else {
+        // try to detect key signature via *k: or *K:, common humdrum forms
+        const m = humData.match(/^\*k:\s*([A-Ga-g][#b♯♭-]?)(\s*major|\s*minor)?/mi);
+        if (m) {
+          const letter = m[1][0];
+          const acc = (m[1].length>1? m[1][1] : '');
+          const idx = keyToIndex(letter, acc || '');
+          if (idx !== null) {
+            originalKeyIndex = idx;
+            originalAccidentalPref = acc || '';
+            originalIsMajor = !(m[2] && /minor/i.test(m[2]));
+          }
+        }
+      }
+
+      // If we have a key, build a short enharmonic cycle candidate list for UI toggle
+      if (originalKeyIndex !== null) {
+        const cand = SAFE_TONICS_MAJOR[originalKeyIndex] || [];
+        enharmonicCycleList = Array.from(new Set(cand.map(x => tonicNameNormalized(x))));
+        // prefer the canonical accidental based on ACCIDENTAL_COUNT if present
+        if (enharmonicCycleList.length > 1) {
+          // keep as-is for toggle
+        }
+      }
+    }
+
+    /* -------------------- random button reload -------------------- */
+    document.getElementById('randomBtn').addEventListener('click', async ()=>{
+      const initial = await loadRandomTuneToHumData();
+      if (initial) {
+        filename = initial.filename;
+        humData = initial.text;
+        const meta = extractSecondSpineMeta(humData);
+        const pillText = (meta.dir || meta.title || meta.number)
+          ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
+          : (filename || '—');
+        document.getElementById('titleValue').textContent = pillText || (filename || '—');
+        deriveOriginalKeyFromHum();
+        displayTonicOverride = null;
+        renderWithTranspose();
+      } else {
+        alert('No tunes.json or tune files found at the expected relative path. See console for fetch attempts.');
+      }
+    });
+
+    /* -------------------- initial derive & render -------------------- */
+    deriveOriginalKeyFromHum();
+    renderWithTranspose();
+
+    /* -------------------- end IIFE -------------------- */
   })();
   </script>
 </body>
