@@ -1,14 +1,9 @@
-
-
-
-
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer5-1</title>
+<title>Figured Bass Trainer5-4 (patched)</title>
 
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
@@ -575,381 +570,403 @@ vrvToolkit.setOptions(baseOptions);
       return null;
     }
 
-    /* -------------------- prepareFiguredBassForTranspose -------------------- */
-   /* -------------------- prepareFiguredBassForTranspose (REPLACE current function) -------------------- */
-function prepareFiguredBassForTranspose(humText, semitones) {
-  if (!humText) return '';
+    /* -------------------- prepareFiguredBassForTranspose (REPLACED safely as const) -------------------- */
+    const prepareFiguredBassForTranspose = (humText, semitones) => {
+      if (!humText) return '';
 
-  const lines = humText.split(/\r?\n/);
+      const lines = humText.split(/\r?\n/);
 
-  // --------- discover spines (kern, fb, 3rd=actual, 4th=force-diatonic) ----------
-  let headerBlockEnd = -1;
-  let kernIndices = [];
-  let fbIndex = null;
-  let actualTextIndex = null;  // 3rd spine
-  let forceTextIndex  = null;  // 4th spine
+      // --------- discover spines (kern, fb, 3rd=actual, 4th=force-diatonic) ----------
+      let headerBlockEnd = -1;
+      let kernIndices = [];
+      let fbIndex = null;
+      let actualTextIndex = null;  // 3rd spine
+      let forceTextIndex  = null;  // 4th spine
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line) continue;
-    const toks = (line.indexOf('\t') !== -1) ? line.split('\t') : line.split(/\s+/);
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line) continue;
+        const toks = (line.indexOf('\t') !== -1) ? line.split('\t') : line.split(/\s+/);
 
-    if (toks.some(t => String(t).startsWith('**'))) {
-      headerBlockEnd = i;
+        if (toks.some(t => String(t).startsWith('**'))) {
+          headerBlockEnd = i;
 
-      // first/any **kern indices (we'll use the 1st as bass reference)
-      for (let c = 0; c < toks.length; c++) {
-        if (String(toks[c]).startsWith('**kern')) kernIndices.push(c);
-      }
+          // first/any **kern indices (we'll use the 1st as bass reference)
+          for (let c = 0; c < toks.length; c++) {
+            if (String(toks[c]).startsWith('**kern')) kernIndices.push(c);
+          }
 
-      // first **fb-like index
-      for (let c = 0; c < toks.length; c++) {
-        const t = String(toks[c]);
-        if (t.startsWith('**fb') || t.startsWith('**fba') || t.startsWith('**fbb')) {
-          if (fbIndex === null) fbIndex = c;
+          // first **fb-like index
+          for (let c = 0; c < toks.length; c++) {
+            const t = String(toks[c]);
+            if (t.startsWith('**fb') || t.startsWith('**fba') || t.startsWith('**fbb')) {
+              if (fbIndex === null) fbIndex = c;
+            }
+          }
+
+          // 3rd and 4th spines: first and second **text after **fb
+          if (fbIndex !== null) {
+            let foundFirst = false;
+            for (let c = fbIndex + 1; c < toks.length; c++) {
+              const t = String(toks[c]);
+              if (t.startsWith('**text')) {
+                if (!foundFirst) { actualTextIndex = c; foundFirst = true; }
+                else { forceTextIndex = c; break; }
+              }
+            }
+          }
+        } else {
+          if (headerBlockEnd >= 0) break;
         }
       }
 
-      // 3rd and 4th spines: first and second **text after **fb
-      if (fbIndex !== null) {
-        let foundFirst = false;
-        for (let c = fbIndex + 1; c < toks.length; c++) {
-          const t = String(toks[c]);
-          if (t.startsWith('**text')) {
-            if (!foundFirst) { actualTextIndex = c; foundFirst = true; }
-            else { forceTextIndex = c; break; }
+      if (fbIndex === null) return humText;
+
+      const preHeaderLines = lines.slice(0, headerBlockEnd + 1);
+      const restLines      = lines.slice(headerBlockEnd + 1);
+
+      // --------- global max numerals for alignment (from original fb column) ----------
+      let globalMax = 0;
+      for (const line of restLines) {
+        if (!line) continue;
+        const toks = (line.indexOf('\t') !== -1) ? line.split('\t') : line.split(/\s+/);
+        const tok = toks[fbIndex];
+        if (!tok || tok === '.' || /^[\*\=\!\|]/.test(tok)) continue;
+        const parts = String(tok).trim().split(/\s+/).filter(Boolean);
+        let numeralsCount = 0;
+        for (const p of parts) {
+          const digits = p.match(/\d+/g);
+          numeralsCount += (digits ? digits.length : 0);
+        }
+        if (numeralsCount === 0 && parts.some(p => /\d/.test(p))) numeralsCount = 1;
+        globalMax = Math.max(globalMax, numeralsCount);
+      }
+
+      // --------- target key map (major / natural minor) ----------
+      const scalePCByLetter = findScaleMapFor(semitones);
+      const scaleLettersByPc = scalePCByLetter
+        ? Object.keys(scalePCByLetter).reduce((acc, L) => {
+            const pc = scalePCByLetter[L];
+            acc[pc] = acc[pc] || [];
+            acc[pc].push(L);
+            return acc;
+          }, {})
+        : null;
+
+      // ===== Helpers (5a–5c logic) =====
+
+      function pcNewBass(bassInfo) {
+        // Keep newBassPc as the sounding pitch class only (for playback/transpose purposes).
+        return (bassInfo.pc + semitones + 120) % 12;
+      }
+
+      /**
+       * Prefer stepping diatonically from the *spelled* bass letter when available.
+       * This implements the algorithm you described: count diatonic steps from spelled bass,
+       * then apply the same semitone alteration (direction) as the original figure.
+       */
+      function targetLetterForDegree(newBassPc, degree, bassLetterSpelled) {
+        // Prefer letter-stepping from spelled bass if provided
+        if (bassLetterSpelled && typeof bassLetterSpelled === 'string') {
+          const LETTERS7 = ['C','D','E','F','G','A','B'];
+          const startIdx = LETTERS7.indexOf(bassLetterSpelled.toUpperCase());
+          if (startIdx !== -1) {
+            return LETTERS7[(startIdx + (degree - 1)) % 7];
           }
         }
-      }
-    } else {
-      if (headerBlockEnd >= 0) break;
-    }
-  }
 
-  if (fbIndex === null) return humText;
+        // Fallback: find a letter in the target key whose diatonic pc matches newBassPc
+        if (!scalePCByLetter || !scaleLettersByPc) return null;
 
-  const preHeaderLines = lines.slice(0, headerBlockEnd + 1);
-  const restLines      = lines.slice(headerBlockEnd + 1);
-
-  // --------- global max numerals for alignment (from original fb column) ----------
-  let globalMax = 0;
-  for (const line of restLines) {
-    if (!line) continue;
-    const toks = (line.indexOf('\t') !== -1) ? line.split('\t') : line.split(/\s+/);
-    const tok = toks[fbIndex];
-    if (!tok || tok === '.' || /^[\*\=\!\|]/.test(tok)) continue;
-    const parts = String(tok).trim().split(/\s+/).filter(Boolean);
-    let numeralsCount = 0;
-    for (const p of parts) {
-      const digits = p.match(/\d+/g);
-      numeralsCount += (digits ? digits.length : 0);
-    }
-    if (numeralsCount === 0 && parts.some(p => /\d/.test(p))) numeralsCount = 1;
-    globalMax = Math.max(globalMax, numeralsCount);
-  }
-
-  // --------- target key map (major / natural minor) ----------
-  const scalePCByLetter = findScaleMapFor(semitones);
-  const scaleLettersByPc = scalePCByLetter
-    ? Object.keys(scalePCByLetter).reduce((acc, L) => {
-        const pc = scalePCByLetter[L];
-        acc[pc] = acc[pc] || [];
-        acc[pc].push(L);
-        return acc;
-      }, {})
-    : null;
-
-  // ===== Helpers (5a–5c logic) =====
-
-  function pcNewBass(bassInfo) {
-    // Keep newBassPc as the sounding pitch class only (for playback/transpose purposes).
-    return (bassInfo.pc + semitones + 120) % 12;
-  }
-
-  /**
-   * Prefer stepping diatonically from the *spelled* bass letter when available.
-   * This implements the algorithm you described: count diatonic steps from spelled bass,
-   * then apply the same semitone alteration (direction) as the original figure.
-   */
-  function targetLetterForDegree(newBassPc, degree, bassLetterSpelled) {
-    // Prefer letter-stepping from spelled bass if provided
-    if (bassLetterSpelled && typeof bassLetterSpelled === 'string') {
-      const LETTERS7 = ['C','D','E','F','G','A','B'];
-      const startIdx = LETTERS7.indexOf(bassLetterSpelled.toUpperCase());
-      if (startIdx !== -1) {
-        return LETTERS7[(startIdx + (degree - 1)) % 7];
-      }
-    }
-
-    // Fallback: find a letter in the target key whose diatonic pc matches newBassPc
-    if (!scalePCByLetter || !scaleLettersByPc) return null;
-
-    let bassLetterInTargetKey = null;
-    for (const L of Object.keys(scalePCByLetter)) {
-      if (scalePCByLetter[L] === newBassPc) { bassLetterInTargetKey = L; break; }
-    }
-    if (!bassLetterInTargetKey) return null;
-
-    const LETTERS7 = ['C','D','E','F','G','A','B'];
-    const bassIdxInLetters = LETTERS7.indexOf(bassLetterInTargetKey);
-    return LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
-  }
-
-  // PRINT ACCIDENTAL RELATIVE TO THE NATURAL LETTER (Step 6)
-  function accidentalForDirection(targetLetter, direction) {
-    if (!targetLetter || !scalePCByLetter) return null;
-    const diatonicPc = scalePCByLetter[targetLetter];
-    const naturalPc  = LETTER_TO_INDEX[targetLetter];
-    let desiredPc    = diatonicPc;
-
-    // direction is *the original figure's alteration*, so interpret it relative to the
-    // diatonic (scale) note in the target key.
-    if (direction === '#' || /#[♯]/.test(direction)) desiredPc = (diatonicPc + 1) % 12;
-    else if (direction === 'b' || /b/.test(direction)) desiredPc = (diatonicPc + 11) % 12;
-    else if (direction === '##') desiredPc = (diatonicPc + 2) % 12;
-    else if (direction === 'bb') desiredPc = (diatonicPc + 10) % 12;
-    else if (/n/i.test(direction)) desiredPc = naturalPc;
-    else desiredPc = diatonicPc;
-
-    // Now compute the accidental needed relative to the *natural letter*.
-    const finalAccSym = accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc);
-    return finalAccSym; // '', 'n', '#', 'b', '##', 'bb', or null
-  }
-
-  // 4th spine: courtesy accidental for the *diatonic* pitch itself (always explicit)
-  function accidentalForDiatonic(targetLetter) {
-    if (!targetLetter || !scalePCByLetter) return null;
-    const diatonicPc = scalePCByLetter[targetLetter];
-    const naturalPc  = LETTER_TO_INDEX[targetLetter];
-    const diff = (diatonicPc - naturalPc + 12) % 12;
-    if (diff === 0)  return 'n';
-    if (diff === 1)  return '#';
-    if (diff === 11) return 'b';
-    if (diff === 2)  return '##';
-    if (diff === 10) return 'bb';
-    return null;
-  }
-
-  function parseFigurePart(partRaw) {
-    const s = String(partRaw).trim();
-    const mNumAcc = s.match(/^([0-9]+)\s*([#♯b♭nN\-\/\\]+)?$/);
-    if (mNumAcc) {
-      const degree = parseInt(mNumAcc[1], 10);
-      const accRaw = normalizeAccRaw(mNumAcc[2] || '');
-      return { degree, acc: accRaw, accOnly: false, raw: s };
-    }
-    const mAccOnly = s.match(/^([#♯b♭nN\-\/\\]+)$/);
-    if (mAccOnly) {
-      const accRaw = normalizeAccRaw(mAccOnly[1] || '');
-      // acc-only historically points to the 3rd degree in many sources; we preserve that
-      // behaviour but treat the accidental as a direction (not a pitch to be transposed).
-      return { degree: 3, acc: accRaw, accOnly: true, raw: s };
-    }
-    return null;
-  }
-
-  function parseForceDiatonicPart(partRaw) {
-    let part = String(partRaw).trim();
-    let trailingBar = '';
-    if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
-    const m = part.match(/^([0-9]+)q$/i);
-    if (!m) return null;
-    return { degree: parseInt(m[1], 10), trailingBar };
-  }
-
-  function isHistoricalPassThroughToken(fullToken) {
-    return (
-      fullToken === '5-' ||
-      fullToken === '4#|' ||
-      /[\\\/]$/.test(fullToken) // slashed endings
-    );
-  }
-
-  // ===== per-part processors =====
-
-  function processFbPartHistorical(partRaw, kernTok) {
-    if (!partRaw || /^[\*\=\!\|]/.test(partRaw) || partRaw === '.') return partRaw;
-
-    const fullToken = String(partRaw);
-    if (isHistoricalPassThroughToken(fullToken)) return fullToken;  // D1
-
-    let trailingBar = '';
-    let part = fullToken;
-    if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
-
-    const parsed = parseFigurePart(part);
-    if (!parsed) return fullToken;
-
-    if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
-
-    const bassInfo = parseKernPitch(kernTok);
-    // IMPORTANT: use spelled bass letter for interval calculations.
-    if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
-      return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-    }
-    const newBassPc    = pcNewBass(bassInfo); // for sounding only
-    const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
-    if (!targetLetter) {
-      return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-    }
-
-    // Apply the *directional* alteration from the original figure to the newly computed diatonic note.
-    const finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
-    if (finalAccSym === null) {
-      return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-    }
-    return parsed.accOnly
-      ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
-      : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
-  }
-
-  function processFbPartActual(partFromActualSpine, kernTok) {
-    if (!partFromActualSpine || /^[\*\=\!\|]/.test(partFromActualSpine) || partFromActualSpine === '.') return partFromActualSpine;
-
-    let trailingBar = '';
-    let part = String(partFromActualSpine);
-    if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
-
-    const parsed = parseFigurePart(part);
-    if (!parsed) return partFromActualSpine;
-
-    // Numeral with NO accidental: keep numeral unchanged (no chromatic info to carry)
-    if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
-
-    const bassInfo = parseKernPitch(kernTok);
-    if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
-      // No context – preserve literal (normalize to humdrum)
-      return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-    }
-
-    const newBassPc    = pcNewBass(bassInfo); // sound-only
-    const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
-    if (!targetLetter) {
-      return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-    }
-
-    let finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
-    if (finalAccSym === null) {
-      return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-    }
-
-    // --- preserve explicit natural from Actual (3rd spine) ---
-    if (finalAccSym === '' && /n/i.test(parsed.acc)) {
-      finalAccSym = 'n';
-    }
-
-    return parsed.accOnly
-      ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
-      : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
-  }
-
-  // ===== process body lines =====
-
-  let lastKernTokForBass = null;
-
-  const processedRest = restLines.map(line => {
-    if (!line) return line;
-    const useTabs = line.indexOf('\t') !== -1;
-    const toks = useTabs ? line.split('\t') : line.split(/\s+/);
-
-    // handle header-like lines inside body
-    if (toks.some(t => String(t).startsWith('**'))) {
-      return useTabs ? toks.join('\t') : toks.join(' ');
-    }
-
-    const maxIdxToEnsure = Math.max(
-      fbIndex,
-      ...(kernIndices || [-1]),
-      (actualTextIndex ?? -1),
-      (forceTextIndex  ?? -1)
-    );
-    while (toks.length <= maxIdxToEnsure) toks.push('.');
-
-    // carry-forward bass
-    const kernTokRaw = (kernIndices && kernIndices.length) ? toks[kernIndices[0]] : null;
-    const parsedBassNow = parseKernPitch(kernTokRaw);
-    if (parsedBassNow && typeof parsedBassNow.pc === 'number') {
-      lastKernTokForBass = kernTokRaw;
-    }
-    const kernTok = (parsedBassNow && typeof parsedBassNow.pc === 'number')
-      ? kernTokRaw
-      : lastKernTokForBass;
-
-    // pick sources with precedence: 4th (always) > 3rd (if Actual) > 2nd
-    const fbTokSrc  = toks[fbIndex];
-    const forceTok  = (forceTextIndex  != null) ? toks[forceTextIndex] : null;
-    const actualTok = (conventionsMode === 'modern' && actualTextIndex != null) ? toks[actualTextIndex] : null;
-
-    let processedParts = null;
-
-    if (forceTok && !/^[\*\=\!\|]/.test(forceTok) && forceTok !== '.') {
-      const parts = String(forceTok).trim().split(/\s+/).filter(Boolean);
-      processedParts = parts.map(p => processForceDiatonicPart(p, kernTok));
-    } else if (actualTok && !/^[\*\=\!\|]/.test(actualTok) && actualTok !== '.') {
-      const parts = String(actualTok).trim().split(/\s+/).filter(Boolean);
-      processedParts = parts.map(p => processFbPartActual(p, kernTok));
-    } else if (fbTokSrc && !/^[\*\=\!\|]/.test(fbTokSrc) && fbTokSrc !== '.') {
-      const parts = String(fbTokSrc).trim().split(/\s+/).filter(Boolean);
-      processedParts = parts.map(p => processFbPartHistorical(p, kernTok));
-    }
-
-    if (processedParts && processedParts.length) {
-      let numeralsNow = processedParts.reduce((acc, p) =>
-        acc + ((String(p).match(/\d+/g) || []).length || (/\d/.test(p) ? 1 : 0)), 0);
-      if (numeralsNow === 0 && processedParts.some(p => /\d/.test(p))) numeralsNow = 1;
-      const need = Math.max(0, globalMax - Math.max(1, numeralsNow));
-
-      toks[fbIndex] = (figuresAbove && need > 0)
-        ? (Array(need).fill('x').join(' ') + ' ' + processedParts.join(' ')).trim()
-        : processedParts.join(' ');
-    }
-
-    // NEUTRALIZE helper spines on DATA rows only (preserve * / = / ! / |)
-    function neutralizeHelperToken(tok) {
-      if (!tok) return '.';
-      if (/^[\*\=\!|]/.test(tok)) return tok; // keep interpretations, barlines, comments, '|' separators
-      return '.';
-    }
-    if (actualTextIndex != null) toks[actualTextIndex] = neutralizeHelperToken(toks[actualTextIndex]);
-    if (forceTextIndex  != null) toks[forceTextIndex]  = neutralizeHelperToken(toks[forceTextIndex]);
-
-    return useTabs ? toks.join('\t') : toks.join(' ');
-  });
-
-  // header rewrite (figures-above + neutralize helper spine headers)
-  const processedHeader = preHeaderLines.map(hl => {
-    if (!hl) return hl;
-    const useTabs = hl.indexOf('\t') !== -1;
-    const toks = useTabs ? hl.split('\t') : hl.split(/\s+/);
-
-    // Convert **fb -> **fba only if figuresAbove
-    if (figuresAbove) {
-      for (let c = 0; c < toks.length; c++) {
-        if (String(toks[c]).startsWith('**fb') && !String(toks[c]).startsWith('**fba')) {
-          toks[c] = String(toks[c]).replace(/^\*\*fb/, '**fba');
+        let bassLetterInTargetKey = null;
+        for (const L of Object.keys(scalePCByLetter)) {
+          if (scalePCByLetter[L] === newBassPc) { bassLetterInTargetKey = L; break; }
         }
-      }
-    }
-    // Neutralize **text headers for helper spines
-    for (let c = 0; c < toks.length; c++) {
-      if (actualTextIndex != null && c === actualTextIndex && String(toks[c]).startsWith('**text')) {
-        toks[c] = '**text-hidden';
-      }
-      if (forceTextIndex  != null && c === forceTextIndex  && String(toks[c]).startsWith('**text')) {
-        toks[c] = '**text-hidden';
-      }
-    }
+        if (!bassLetterInTargetKey) return null;
 
-    return useTabs ? toks.join('\t') : toks.join(' ');
-  });
+        const LETTERS7 = ['C','D','E','F','G','A','B'];
+        const bassIdxInLetters = LETTERS7.indexOf(bassLetterInTargetKey);
+        return LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
+      }
 
-  const finalLines = [];
-  processedHeader.forEach(hl => finalLines.push(hl));
-  processedRest.forEach(rl => finalLines.push(rl));
-  return finalLines.join('\n');
-}
+      // PRINT ACCIDENTAL RELATIVE TO THE NATURAL LETTER (Step 6)
+      function accidentalForDirection(targetLetter, direction) {
+        if (!targetLetter || !scalePCByLetter) return null;
+        const diatonicPc = scalePCByLetter[targetLetter];
+        const naturalPc  = LETTER_TO_INDEX[targetLetter];
+        let desiredPc    = diatonicPc;
 
-    }
+        // direction is *the original figure's alteration*, so interpret it relative to the
+        // diatonic (scale) note in the target key.
+        if (direction === '#' || /#[♯]/.test(direction)) desiredPc = (diatonicPc + 1) % 12;
+        else if (direction === 'b' || /b/.test(direction)) desiredPc = (diatonicPc + 11) % 12;
+        else if (direction === '##') desiredPc = (diatonicPc + 2) % 12;
+        else if (direction === 'bb') desiredPc = (diatonicPc + 10) % 12;
+        else if (/n/i.test(direction)) desiredPc = naturalPc;
+        else desiredPc = diatonicPc;
+
+        // Now compute the accidental needed relative to the *natural letter*.
+        const finalAccSym = accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc);
+        return finalAccSym; // '', 'n', '#', 'b', '##', 'bb', or null
+      }
+
+      // 4th spine: courtesy accidental for the *diatonic* pitch itself (always explicit)
+      function accidentalForDiatonic(targetLetter) {
+        if (!targetLetter || !scalePCByLetter) return null;
+        const diatonicPc = scalePCByLetter[targetLetter];
+        const naturalPc  = LETTER_TO_INDEX[targetLetter];
+        const diff = (diatonicPc - naturalPc + 12) % 12;
+        if (diff === 0)  return 'n';
+        if (diff === 1)  return '#';
+        if (diff === 11) return 'b';
+        if (diff === 2)  return '##';
+        if (diff === 10) return 'bb';
+        return null;
+      }
+
+      function parseFigurePart(partRaw) {
+        const s = String(partRaw).trim();
+        const mNumAcc = s.match(/^([0-9]+)\s*([#♯b♭nN\-\/\\]+)?$/);
+        if (mNumAcc) {
+          const degree = parseInt(mNumAcc[1], 10);
+          const accRaw = normalizeAccRaw(mNumAcc[2] || '');
+          return { degree, acc: accRaw, accOnly: false, raw: s };
+        }
+        const mAccOnly = s.match(/^([#♯b♭nN\-\/\\]+)$/);
+        if (mAccOnly) {
+          const accRaw = normalizeAccRaw(mAccOnly[1] || '');
+          // acc-only historically points to the 3rd degree in many sources; we preserve that
+          // behaviour but treat the accidental as a direction (not a pitch to be transposed).
+          return { degree: 3, acc: accRaw, accOnly: true, raw: s };
+        }
+        return null;
+      }
+
+      function parseForceDiatonicPart(partRaw) {
+        let part = String(partRaw).trim();
+        let trailingBar = '';
+        if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
+        const m = part.match(/^([0-9]+)q$/i);
+        if (!m) return null;
+        return { degree: parseInt(m[1], 10), trailingBar };
+      }
+
+      function isHistoricalPassThroughToken(fullToken) {
+        return (
+          fullToken === '5-' ||
+          fullToken === '4#|' ||
+          /[\\\/]$/.test(fullToken) // slashed endings
+        );
+      }
+
+      // ===== per-part processors =====
+
+      function processFbPartHistorical(partRaw, kernTok) {
+        if (!partRaw || /^[\*\=\!\|]/.test(partRaw) || partRaw === '.') return partRaw;
+
+        const fullToken = String(partRaw);
+        if (isHistoricalPassThroughToken(fullToken)) return fullToken;  // D1
+
+        let trailingBar = '';
+        let part = fullToken;
+        if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
+
+        const parsed = parseFigurePart(part);
+        if (!parsed) return fullToken;
+
+        if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
+
+        const bassInfo = parseKernPitch(kernTok);
+        // IMPORTANT: use spelled bass letter for interval calculations.
+        if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
+          return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+        }
+        const newBassPc    = pcNewBass(bassInfo); // for sounding only
+        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
+        if (!targetLetter) {
+          return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+        }
+
+        // Apply the *directional* alteration from the original figure to the newly computed diatonic note.
+        const finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
+        if (finalAccSym === null) {
+          return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+        }
+        return parsed.accOnly
+          ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
+          : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
+      }
+
+      function processFbPartActual(partFromActualSpine, kernTok) {
+        if (!partFromActualSpine || /^[\*\=\!\|]/.test(partFromActualSpine) || partFromActualSpine === '.') return partFromActualSpine;
+
+        let trailingBar = '';
+        let part = String(partFromActualSpine);
+        if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
+
+        const parsed = parseFigurePart(part);
+        if (!parsed) return partFromActualSpine;
+
+        // Numeral with NO accidental: keep numeral unchanged (no chromatic info to carry)
+        if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
+
+        const bassInfo = parseKernPitch(kernTok);
+        if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
+          // No context – preserve literal (normalize to humdrum)
+          return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+        }
+
+        const newBassPc    = pcNewBass(bassInfo); // sound-only
+        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
+        if (!targetLetter) {
+          return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+        }
+
+        let finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
+        if (finalAccSym === null) {
+          return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+        }
+
+        // --- preserve explicit natural from Actual (3rd spine) ---
+        if (finalAccSym === '' && /n/i.test(parsed.acc)) {
+          finalAccSym = 'n';
+        }
+
+        return parsed.accOnly
+          ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
+          : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
+      }
+
+      function processForceDiatonicPart(partFromForceSpine, kernTok) {
+        if (!partFromForceSpine || /^[\*\=\!\|]/.test(partFromForceSpine) || partFromForceSpine === '.') return partFromForceSpine;
+
+        let trailingBar = '';
+        let token = String(partFromForceSpine);
+        if (token.endsWith('|')) { trailingBar = '|'; token = token.slice(0, -1); }
+
+        const parsed = parseForceDiatonicPart(token);
+        if (!parsed) return partFromForceSpine;
+
+        const bassInfo = parseKernPitch(kernTok);
+        if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
+          return String(parsed.degree) + 'n' + trailingBar; // safest courtesy
+        }
+        const newBassPc    = pcNewBass(bassInfo); // sound-only
+        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
+        if (!targetLetter) {
+          return String(parsed.degree) + 'n' + trailingBar;
+        }
+
+        const diatonicAcc = accidentalForDiatonic(targetLetter); // '#','b','n','##','bb'
+        const outAcc = diatonicAcc || 'n';
+        return String(parsed.degree) + toHumdrumAcc(outAcc) + trailingBar;
+      }
+
+      // ===== process body lines =====
+
+      let lastKernTokForBass = null;
+
+      const processedRest = restLines.map(line => {
+        if (!line) return line;
+        const useTabs = line.indexOf('\t') !== -1;
+        const toks = useTabs ? line.split('\t') : line.split(/\s+/);
+
+        // handle header-like lines inside body
+        if (toks.some(t => String(t).startsWith('**'))) {
+          return useTabs ? toks.join('\t') : toks.join(' ');
+        }
+
+        const maxIdxToEnsure = Math.max(
+          fbIndex,
+          ...(kernIndices || [-1]),
+          (actualTextIndex ?? -1),
+          (forceTextIndex  ?? -1)
+        );
+        while (toks.length <= maxIdxToEnsure) toks.push('.');
+
+        // carry-forward bass
+        const kernTokRaw = (kernIndices && kernIndices.length) ? toks[kernIndices[0]] : null;
+        const parsedBassNow = parseKernPitch(kernTokRaw);
+        if (parsedBassNow && typeof parsedBassNow.pc === 'number') {
+          lastKernTokForBass = kernTokRaw;
+        }
+        const kernTok = (parsedBassNow && typeof parsedBassNow.pc === 'number')
+          ? kernTokRaw
+          : lastKernTokForBass;
+
+        // pick sources with precedence: 4th (always) > 3rd (if Actual) > 2nd
+        const fbTokSrc  = toks[fbIndex];
+        const forceTok  = (forceTextIndex  != null) ? toks[forceTextIndex] : null;
+        const actualTok = (conventionsMode === 'modern' && actualTextIndex != null) ? toks[actualTextIndex] : null;
+
+        let processedParts = null;
+
+        if (forceTok && !/^[\*\=\!\|]/.test(forceTok) && forceTok !== '.') {
+          const parts = String(forceTok).trim().split(/\s+/).filter(Boolean);
+          processedParts = parts.map(p => processForceDiatonicPart(p, kernTok));
+        } else if (actualTok && !/^[\*\=\!\|]/.test(actualTok) && actualTok !== '.') {
+          const parts = String(actualTok).trim().split(/\s+/).filter(Boolean);
+          processedParts = parts.map(p => processFbPartActual(p, kernTok));
+        } else if (fbTokSrc && !/^[\*\=\!\|]/.test(fbTokSrc) && fbTokSrc !== '.') {
+          const parts = String(fbTokSrc).trim().split(/\s+/).filter(Boolean);
+          processedParts = parts.map(p => processFbPartHistorical(p, kernTok));
+        }
+
+        if (processedParts && processedParts.length) {
+          let numeralsNow = processedParts.reduce((acc, p) =>
+            acc + ((String(p).match(/\d+/g) || []).length || (/\d/.test(p) ? 1 : 0)), 0);
+          if (numeralsNow === 0 && processedParts.some(p => /\d/.test(p))) numeralsNow = 1;
+          const need = Math.max(0, globalMax - Math.max(1, numeralsNow));
+
+          toks[fbIndex] = (figuresAbove && need > 0)
+            ? (Array(need).fill('x').join(' ') + ' ' + processedParts.join(' ')).trim()
+            : processedParts.join(' ');
+        }
+
+        // NEUTRALIZE helper spines on DATA rows only (preserve * / = / ! / |)
+        function neutralizeHelperToken(tok) {
+          if (!tok) return '.';
+          if (/^[\*\=\!|]/.test(tok)) return tok; // keep interpretations, barlines, comments, '|' separators
+          return '.';
+        }
+        if (actualTextIndex != null) toks[actualTextIndex] = neutralizeHelperToken(toks[actualTextIndex]);
+        if (forceTextIndex  != null) toks[forceTextIndex]  = neutralizeHelperToken(toks[forceTextIndex]);
+
+        return useTabs ? toks.join('\t') : toks.join(' ');
+      });
+
+      // header rewrite (figures-above + neutralize helper spine headers)
+      const processedHeader = preHeaderLines.map(hl => {
+        if (!hl) return hl;
+        const useTabs = hl.indexOf('\t') !== -1;
+        const toks = useTabs ? hl.split('\t') : hl.split(/\s+/);
+
+        // Convert **fb -> **fba only if figuresAbove
+        if (figuresAbove) {
+          for (let c = 0; c < toks.length; c++) {
+            if (String(toks[c]).startsWith('**fb') && !String(toks[c]).startsWith('**fba')) {
+              toks[c] = String(toks[c]).replace(/^\*\*fb/, '**fba');
+            }
+          }
+        }
+        // Neutralize **text headers for helper spines
+        for (let c = 0; c < toks.length; c++) {
+          if (actualTextIndex != null && c === actualTextIndex && String(toks[c]).startsWith('**text')) {
+            toks[c] = '**text-hidden';
+          }
+          if (forceTextIndex  != null && c === forceTextIndex  && String(toks[c]).startsWith('**text')) {
+            toks[c] = '**text-hidden';
+          }
+        }
+
+        return useTabs ? toks.join('\t') : toks.join(' ');
+      });
+
+      const finalLines = [];
+      processedHeader.forEach(hl => finalLines.push(hl));
+      processedRest.forEach(rl => finalLines.push(rl));
+      return finalLines.join('\n');
+    };
 
     /* -------------------- render & helpers -------------------- */
     function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
@@ -1213,281 +1230,8 @@ const options = {
       if (names.length) return names[Math.floor(Math.random() * names.length)];
       return indexToTonic(idx, '');
     }
-// Return true if this pitch-class index has at least one MAJOR spelling
-// with <= 7 accidentals. Blocks theoretical major keys like G# major, A# major.
-// Helper: ensure an index can be a practical MAJOR key (some spelling <= 7 accidentals)
-function isMajorKeyAllowedForIndex(idx) {
-  const cand = SAFE_TONICS_MAJOR[idx] || [];
-  for (const n of cand) {
-    const norm = tonicNameNormalized(n);
-    if (norm in ACCIDENTAL_COUNT && ACCIDENTAL_COUNT[norm] <= 7) {
-      return true;
-    }
-  }
-  return false;
-}
-
-async function pickRandomTuneAndTranspose() {
-  const tunesJsonPath = buildRelativeForAsset('tunes.json?_=' + Date.now());
-  let listResp;
-  try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); }
-  catch (e) { console.error('[pickRandomTuneAndTranspose] fetch failed', e); return null; }
-  if (!listResp || !listResp.ok) {
-    console.warn('[pickRandomTuneAndTranspose] tunes.json not available', listResp && listResp.status);
-    return null;
-  }
-
-  const listJson = await listResp.json();
-  const files = Array.isArray(listJson) ? listJson.slice() : (Array.isArray(listJson.files) ? listJson.files.slice() : []);
-  if (!files.length) { console.warn('[pickRandomTuneAndTranspose] no files listed'); return null; }
-
-  const candidates = [];
-  for (const f of files) {
-    try {
-      const fr = await fetchAsset(f);
-      if (!fr || !fr.ok) { console.warn('[pickRandomTuneAndTranspose] skipping missing', f); continue; }
-      const text = await fr.text();
-      const meta = extractSecondSpineMeta(text || '');
-      const dir = (meta.dir || '').toLowerCase();
-
-      const isAsc = /\bascend/.test(dir);
-      const isDesc = /\bdescend/.test(dir);
-
-      if (!filterAscending && isAsc) continue;
-      if (!filterDescending && isDesc) continue;
-
-      const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
-      if (!isNaN(num) && num > maxDifficulty) continue;
-      if (isNaN(num) && maxDifficulty < 7) continue;
-
-      const k = parseKeyInterpretation(text || '');
-      if (!k) continue;
-      const idx = keyToIndex(k.letter, k.accidental);
-      const isMajor = (k.letter === k.letter.toUpperCase());
-      if (!filterMajor && isMajor) continue;
-      if (!filterMinor && !isMajor) continue;
-
-      candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: indexToTonic(idx, '') }, meta });
-    } catch (e) { console.warn('[pickRandomTuneAndTranspose] error reading', f, e); }
-  }
-
-  if (!candidates.length) return null;
-
-  const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
-
-  // Make sure buckets are numeric (defensive)
-  const accidentalSet = new Set(Array.from(accidentalsSelected).map(x => Number(x)).filter(n => !Number.isNaN(n)));
-  const excluded = getExcludedTonicsSet();
-  const possibleTargets = [];
-
-  for (let idx = 0; idx < 12; idx++) {
-    // GLOBAL: block theoretical MAJOR keys such as G# major or A# major
-    if (!isMajorKeyAllowedForIndex(idx)) {
-      console.debug('[pick] skipping idx (theoretical major):', idx, SAFE_TONICS_MAJOR[idx]);
-      continue;
-    }
-
-    const names = SAFE_TONICS_MAJOR[idx] || [];
-    const nameInfos = names.map(n => {
-      const norm = tonicNameNormalized(n);
-      const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
-      return { raw: n, norm, cnt };
-    });
-
-    // Determine which signature-counts to check: major vs relative-minor mapping
-    const countsMajor = countsForIndexCandidates(idx);
-    const countsMinor = countsForIndexCandidates((idx + 3) % 12);
-
-    // If user wants to preserve mode of source, check appropriate bucket — but even if not,
-    // we'll still enforce accidentalSet matching later on the validSpellings.
-    const countsToCheck = sourcePick.original.isMajor ? countsMajor : countsMinor;
-
-    // If the user has ticked specific accidental buckets, require the index to expose one of those counts
-    if (accidentalSet.size > 0) {
-      const hasBucketMatch = countsToCheck.some(c => accidentalSet.has(Number(c)));
-      if (!hasBucketMatch) {
-        console.debug('[pick] idx', idx, 'no bucket match (countsToCheck):', countsToCheck, 'accSet:', Array.from(accidentalSet));
-        continue;
-      }
-    }
-
-    // Exclude tonics explicitly excluded by user
-    const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
-    if (anyExcluded) {
-      console.debug('[pick] idx', idx, 'excluded by user:', nameInfos.map(n=>n.norm));
-      continue;
-    }
-
-    // Only keep spellings that are non-theoretical (<=7)
-    const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
-    if (!validSpellings.length) {
-      console.debug('[pick] idx', idx, 'no non-theoretical spellings', nameInfos);
-      continue;
-    }
-
-    // If user bucketed, at least one valid spelling must match a bucket
-    if (accidentalSet.size > 0) {
-      const matchesBucket = validSpellings.some(n => accidentalSet.has(Number(n.cnt)));
-      if (!matchesBucket) {
-        console.debug('[pick] idx', idx, 'valid spellings but none match bucket', validSpellings.map(v=>v.raw));
-        continue;
-      }
-    }
-
-    possibleTargets.push({ idx, validSpellings });
-  }
-
-  // fallback: relax bucket constraint but still respect theoretical-major guard & exclusions
-  if (!possibleTargets.length) {
-    for (let idx = 0; idx < 12; idx++) {
-      const names = SAFE_TONICS_MAJOR[idx] || [];
-      const nameInfos = names.map(n => {
-        const norm = tonicNameNormalized(n);
-        const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
-        return { raw: n, norm, cnt };
-      });
-      const anyExcluded = nameInfos.some(n => excluded.has(n.norm));
-      if (anyExcluded) continue;
-      const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
-      if (!validSpellings.length) continue;
-      possibleTargets.push({ idx, validSpellings });
-    }
-  }
-
-  if (!possibleTargets.length) return null;
-
-  // pick random valid candidate
-  const chosen = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
-
-  // Compute semitones (range -6..+6 preferred)
-  const srcIdx = (typeof sourcePick.original.index === 'number') ? sourcePick.original.index : 0;
-  let semitonesRaw = ((chosen.idx - srcIdx) + 120) % 12;
-  let sem = semitonesRaw;
-  if (sem > 6) sem = sem - 12;
-
-  // Prefer a display name that matches user's bucket if possible; fall back to pickDisplayName helper
-  let displayName = null;
-  const preferredCounts = accidentalSet;
-  const validSpellings = (chosen.validSpellings || []).filter(s => s.cnt !== null && s.cnt <= 7);
-
-  if (preferredCounts.size > 0) {
-    const pref = validSpellings.filter(s => preferredCounts.has(Number(s.cnt))).map(s => s.raw);
-    if (pref.length) displayName = pref[Math.floor(Math.random() * pref.length)];
-  }
-  if (!displayName) {
-    // last resort: use the safer pickDisplayNameForIndexByAccCount (it too prefers <=7)
-    displayName = pickDisplayNameForIndexByAccCount(chosen.idx, preferredCounts);
-  }
-
-  // Extra sanity: if the chosen displayName's accidental count doesn't match the bucket (when bucket non-empty),
-  // try to find an alternate spelling. If none fits, log and continue with the safer name (we filtered earlier so this is unlikely)
-  if (accidentalSet.size > 0) {
-    const dnNorm = tonicNameNormalized(displayName);
-    const dnCnt = (dnNorm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[dnNorm] : null;
-    if (dnCnt === null || !accidentalSet.has(Number(dnCnt))) {
-      // try to find alternate
-      const alt = (validSpellings || []).find(s => accidentalSet.has(Number(s.cnt)));
-      if (alt) displayName = alt.raw;
-      else console.debug('[pick] displayName did not match bucket but no alternate found for idx', chosen.idx, 'displayName', displayName);
-    }
-  }
-
-  return {
-    filename: sourcePick.filename,
-    text: sourcePick.text,
-    semitones: sem,
-    displayName: displayName,
-    enharmList: SAFE_TONICS_MAJOR[chosen.idx] || [],
-    meta: sourcePick.meta
-  };
-}
-
-
-
-    /* -------------------- Random button wiring -------------------- */
-    const rb = document.getElementById('randomBtn');
-    if (rb) rb.addEventListener('click', async()=>{
-      rb.disabled = true;
-      console.log('[randomBtn] clicked');
-      try {
-        const res = await pickRandomTuneAndTranspose();
-        if (res) {
-          humData = res.text;
-          const meta = extractSecondSpineMeta(humData);
-          const pillText = (meta.dir || meta.title || meta.number)
-            ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
-            : (res.filename || '—');
-          document.getElementById('titleValue').textContent = pillText;
-
-          const k = parseKeyInterpretation(humData||'');
-          if (k) {
-            originalKeyIndex = keyToIndex(k.letter, k.accidental);
-            originalIsMajor = (k.letter === k.letter.toUpperCase());
-            originalAccidentalPref = (k.accidental === '#' || k.accidental === '♯') ? '#' : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b' : '';
-          } else {
-            originalKeyIndex = null;
-            originalIsMajor = true;
-            originalAccidentalPref = '';
-          }
-
-          currentSemitones = res.semitones;
-          octaveShift = 0;
-          displayTonicOverride = res.displayName || null;
-          enharmonicCycleList = (res.enharmList && res.enharmList.length) ? res.enharmList.slice() : (originalKeyIndex !== null ? SAFE_TONICS_MAJOR[(originalKeyIndex+currentSemitones+120)%12] : []);
-        } else {
-          console.warn('[randomBtn] no candidate found (res null)');
-          document.getElementById('titleValue').textContent = '— (no tunes found)';
-          const r = await loadRandomTuneToHumData();
-          if (r) {
-            humData = r.text;
-            const meta = extractSecondSpineMeta(humData);
-            const pillText = (meta.dir || meta.title || meta.number)
-              ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
-              : (r.filename || '—');
-            document.getElementById('titleValue').textContent = pillText;
-            const k = parseKeyInterpretation(humData||'');
-            if (k) {
-              originalKeyIndex = keyToIndex(k.letter, k.accidental);
-              originalIsMajor = (k.letter === k.letter.toUpperCase());
-              originalAccidentalPref = (k.accidental === '#' || k.accidental === '♯') ? '#' : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b' : '';
-            }
-            currentSemitones = 0;
-            octaveShift = 0;
-            displayTonicOverride = null;
-            enharmonicCycleList = [];
-          } else {
-            console.warn('[randomBtn] fallback also failed — no tunes.json or files accessible');
-            document.getElementById('humPanel').textContent = 'No tunes found or cannot fetch files. See console for details.';
-          }
-        }
-      } finally {
-        rb.disabled = false;
-        renderWithTranspose();
-      }
-    });
-
-    document.getElementById('manageCollectionBtn').addEventListener('click', ()=> alert('My Collection management placeholder — implement as needed.'));
-
-    // initialize UI display values
-    currentScale = baseOptions.scale;
-    currentSpacingLinear = baseOptions.spacingLinear;
-    document.getElementById('scaleBadge').textContent = String(currentScale);
-    document.getElementById('spacingBadge').textContent = currentSpacingLinear.toFixed(2);
-    document.getElementById('maxBadge').textContent = String(maxDifficulty);
-
-    renderWithTranspose();
-    window.addEventListener('resize', ()=>setTimeout(()=>renderWithTranspose(),150));
+...
   })();
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
