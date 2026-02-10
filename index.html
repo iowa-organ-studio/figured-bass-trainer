@@ -3,69 +3,92 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Figured Bass Trainer 5-43</title>
-
+  <title>Figured Bass Trainer CoPilot1</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
+  <!-- Preserve Verovio load order -->
   <script src="verovio-toolkit-wasm.js"></script>
   <script src="verovio-toolkit-hum.js"></script>
-
   <style>
-  :root{
-    --bg:#f7f7f9; --card:#ffffff; --border:#e3e3ea; --ink:#1b1b1f; --muted:#6b6b76;
-    --gold:#FFCD00; --gold-border:#d7a900; --butter:#FFEFAD; --butter-border:#E6D48A; --radius:12px;
-  }
-  *{box-sizing:border-box}
-  body{ font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    margin:0; padding:10px; background:var(--bg); color:var(--ink); font-weight:400; }
-  .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:8px 10px; }
-  button{ border:none; border-radius:10px; padding:8px 10px; font-size:.96rem; cursor:pointer;
-    transition:background-color 120ms ease, opacity 120ms ease, transform 60ms ease, box-shadow 120ms ease; user-select:none; }
-  button:active{transform:translateY(.5px)} button[disabled]{opacity:.6;cursor:not-allowed}
-  .btn-gold{ background:var(--gold); color:#2d2300; border:1px solid var(--gold-border); }
-  .btn-gold.pill3d { background:var(--gold); color:#2d2300; border:1px solid var(--gold-border); box-shadow:0 2px 0 rgba(160,120,0,.55); }
-  .btn-lite{ background:var(--butter); color:#3b2f00; border:1px solid var(--butter-border); }
-  .miniBtn{ padding:6px 10px; border-radius:10px; font-size:.92rem; min-width:40px; text-align:center; }
-  .pill3d{ border-radius:999px; padding:10px 16px; box-shadow:0 2px 0 rgba(160,120,0,.12),0 10px 20px rgba(0,0,0,.04); background:transparent; border:1px solid var(--border) }
-  .btn-green-pill{ background:#2f7d55; color:#fff; border-radius:999px; padding:10px 16px; }
+    :root{
+      --bg:#f7f7f9; --card:#ffffff; --border:#e3e3ea; --ink:#1b1b1f; --muted:#6b6b76;
+      --gold:#FFCD00; --gold-border:#d7a900; --butter:#FFEFAD; --butter-border:#E6D48A;
+      --radius:12px;
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin:0; padding:10px; background:var(--bg); color:var(--ink); font-weight:400;
+    }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:8px 10px; }
+    button{ border:none; border-radius:10px; padding:8px 10px; font-size:.96rem; cursor:pointer; transition:background-color 120ms ease, opacity 120ms ease, transform 60ms ease, box-shadow 120ms ease; user-select:none; }
+    button:active{transform:translateY(.5px)}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    .btn-gold{ background:var(--gold); color:#2d2300; border:1px solid var(--gold-border); }
+    .btn-gold.pill3d { background:var(--gold); color:#2d2300; border:1px solid var(--gold-border); box-shadow:0 2px 0 rgba(160,120,0,.55); }
+    .btn-lite{ background:var(--butter); color:#3b2f00; border:1px solid var(--butter-border); }
+    .miniBtn{ padding:6px 10px; border-radius:10px; font-size:.92rem; min-width:40px; text-align:center; }
+    .pill3d{ border-radius:999px; padding:10px 16px; box-shadow:0 2px 0 rgba(160,120,0,.12),0 10px 20px rgba(0,0,0,.04); background:transparent; border:1px solid var(--border) }
+    .btn-green-pill{ background:#2f7d55; color:#fff; border-radius:999px; padding:10px 16px; }
 
-  #row1{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
-  .chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:#fff; white-space:nowrap; }
-  #viewerWrap{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; margin-bottom:8px; }
-  #viewer{ padding:8px 12px 4px; min-height:120px; overflow-x:hidden; overflow-y:auto; position:relative; }
-  #svg{ display:block }
-  #musicFooter{ border-top:1px solid var(--border); padding:6px 12px; font-size:.82rem; color:#9aa0aa; text-align:left; background:#fff; }
+    #row1{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+    .chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:#fff; white-space:nowrap; }
 
-  #row3{ display:flex; gap:10px; align-items:stretch; margin-bottom:8px; flex-wrap:wrap; }
-  #keyRangeCard{ width:260px; min-width:260px; padding:8px 10px; }
-  .keyRangeGrid{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px; }
-  .range-btn{ padding:6px 8px; font-size:0.88rem; border-radius:10px; background:#f3f3f8; color:#333; border:1px solid var(--border); }
-  .range-btn.active { background:var(--butter); border:1px solid var(--butter-border); box-shadow: 0 2px 0 rgba(230,212,138,.6); }
+    #viewerWrap{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; margin-bottom:8px; }
+    #viewer{ padding:8px 12px 4px; min-height:120px; overflow-x:hidden; overflow-y:auto; position:relative; }
+    #svg{ display:block }
+    #musicFooter{ border-top:1px solid var(--border); padding:6px 12px; font-size:.82rem; color:#9aa0aa; text-align:left; background:#fff; }
 
-  .tool-btn{ background:#f3f3f8; color:#555; border-radius:8px; padding:6px 8px; border:1px solid var(--border); }
+    #row3{ display:flex; gap:10px; align-items:stretch; margin-bottom:8px; flex-wrap:wrap; }
+    #keyRangeCard{ width:260px; min-width:260px; padding:8px 10px; }
+    .keyRangeGrid{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px; }
+    .range-btn{ padding:6px 8px; font-size:0.88rem; border-radius:10px; background:#f3f3f8; color:#333; border:1px solid var(--border); }
+    .range-btn.active { background:var(--butter); border:1px solid var(--butter-border); box-shadow: 0 2px 0 rgba(230,212,138,.6); }
+    .tool-btn{ background:#f3f3f8; color:#555; border-radius:8px; padding:6px 8px; border:1px solid var(--border); }
 
-  #stackCol{ margin-left:0; width:320px; min-width:320px; display:flex; flex-direction:column; gap:10px; }
-  .sliderHeader{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; font-size:.95rem; color:var(--ink); }
-  .badge{ padding:3px 9px; border:1px solid var(--border); border-radius:999px; background:#fff; color:#222; font-size:0.88rem; }
-  input[type="range"]{ width:100%; accent-color:var(--gold); margin:0; }
-  .miniStackCard{ width:260px; min-width:260px; display:flex; flex-direction:column; gap:6px; padding:8px 10px; }
-  .stackRow{ display:flex; gap:8px; align-items:center; flex-wrap:nowrap; }
+    #stackCol{ margin-left:0; width:320px; min-width:320px; display:flex; flex-direction:column; gap:10px; }
+    .sliderHeader{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; font-size:.95rem; color:var(--ink); }
+    .badge{ padding:3px 9px; border:1px solid var(--border); border-radius:999px; background:#fff; color:#222; font-size:0.88rem; }
+    input[type="range"]{ width:100%; accent-color:var(--gold); margin:0; }
+    .miniStackCard{ width:260px; min-width:260px; display:flex; flex-direction:column; gap:6px; padding:8px 10px; }
+    .stackRow{ display:flex; gap:8px; align-items:center; flex-wrap:nowrap; }
 
-  .chk-label{ display:inline-flex;align-items:center;gap:6px;font-size:.95rem;padding:3px 8px;border-radius:10px;border:1px solid var(--border);background:#fff; }
+    .hum-panel{ margin-top:8px; background:#0f1724; color:#e6eef8; font-family:monospace; font-size:0.86rem; border-radius:10px; overflow:auto; border:1px solid #22303b; }
+    .hum-panel pre{ margin:0; padding:10px; white-space:pre-wrap; word-break:break-word; }
+    .hum-panel summary{ padding:8px 12px; cursor:pointer; font-weight:600; }
 
-  .hum-panel{ margin-top:8px; background:#0f1724; color:#e6eef8; font-family:monospace; font-size:0.86rem; border-radius:10px; overflow:auto; border:1px solid #22303b; }
-  .hum-panel pre{ margin:0; padding:10px; white-space:pre-wrap; word-break:break-word; }
-  .hum-panel summary{ padding:8px 12px; cursor:pointer; font-weight:600; }
+    .collection-card{ display:inline-flex; gap:8px; align-items:center; padding:6px 10px; border-radius:10px; border:1px solid var(--border); background:#fff; }
+
+    #row4 { display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; align-items:flex-start; }
+    .chip .label{ font-size:0.88rem; color:var(--muted); }
+    .chip .value{ font-weight:600; margin-left:6px; font-size:0.95rem; }
+
+    #figPlacementCard, .conventions-card { width:360px; min-width:260px; margin:8px 10px 0 0; padding:6px; display:inline-block; vertical-align:top; }
+    #figPlacementCard fieldset, .conventions-card fieldset { border:0;margin:0;padding:0; }
+    #figPlacementCard legend, .conventions-card legend { font-weight:600; margin-bottom:6px; font-size:0.92rem; }
+    .placement-row{ display:flex; gap:14px; align-items:center; justify-content:flex-start; }
+    .placement-row label, .conventions-row label { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:8px; border:1px solid var(--border); cursor:pointer; background:#fafafa; font-size:.90rem; line-height:1; }
+
+    .cpe-card { display:inline-block; vertical-align:top; width:180px; min-width:160px; margin:8px 10px 0 0; padding:8px; }
+    .small-filter-card { display:inline-block; vertical-align:top; width:240px; min-width:220px; margin:8px 10px 0 0; padding:8px; }
+    .row-equal-height { display:flex; gap:12px; align-items:stretch; flex-wrap:wrap; }
+    .row-equal-height .card { display:flex; flex-direction:column; justify-content:flex-start; }
+    .asc-desc-controls, .major-minor-controls { display:flex; gap:8px; }
+    .asc-desc-btn, .major-minor-btn { padding:8px 12px; border-radius:10px; background:#f3f3f8; border:1px solid var(--border); cursor:pointer; }
+    .asc-desc-btn.active, .major-minor-btn.active { background:var(--butter); border:1px solid var(--butter-border); box-shadow:0 2px 0 rgba(230,212,138,.6); }
+    .boldLabel { font-weight:600; }
+
+    .som-logo { display:block; max-width:720px; margin:18px auto 12px auto; opacity:0.98; }
+
+    input[type="radio"], input[type="checkbox"] { accent-color: var(--gold); }
   </style>
 </head>
 <body>
   <div id="row1">
     <button id="randomBtn" class="btn-gold pill3d" type="button">New Bass Line</button>
-
     <span class="chip pill3d" title="Current title">
       <span id="titleValue" class="valueOnly">—</span>
     </span>
-
     <span class="chip" title="Current key">
       <span class="label">Key</span>
       <span id="statusKey" class="value">—</span>
@@ -97,7 +120,6 @@
         </fieldset>
       </div>
     </div>
-
   </div>
 
   <div id="row3">
@@ -110,20 +132,6 @@
         <button class="tool-btn" type="button" id="keysAllBtn">select all</button>
         <button class="tool-btn" type="button" id="keysNoneBtn">select none</button>
       </div>
-
-      <!-- Exclude tonics UI placed here for clarity -->
-      <div style="height:10px"></div>
-      <div id="excludeCard" class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <div>Exclude tonics</div>
-          <div style="display:flex;gap:8px;">
-            <button id="exAllBtn" type="button" class="tool-btn">select all</button>
-            <button id="exNoneBtn" type="button" class="tool-btn">select none</button>
-          </div>
-        </div>
-        <div id="exRow" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-      </div>
-
     </div>
 
     <div id="stackCol">
@@ -150,6 +158,7 @@
             <span id="spacingBadge" class="badge">—</span>
           </div>
         </div>
+        <!-- max spacing increased to 0.99; default 0.50 -->
         <input id="spacingSlider" type="range" min="0.20" max="0.99" step="0.01" value="0.50" />
       </div>
     </div>
@@ -161,13 +170,76 @@
         <button id="halfUpBtn" class="miniBtn btn-lite" type="button">+</button>
         <button id="enharmonicBtn" class="btn-green-pill" type="button" title="Toggle enharmonic display">♯/♭</button>
       </div>
-
       <div class="stackTitle" style="margin-top:10px;">Octave</div>
       <div class="stackRow">
         <button id="octDownBtn" class="miniBtn btn-lite" type="button">–</button>
         <button id="octUpBtn" class="miniBtn btn-lite" type="button">+</button>
       </div>
     </div>
+  </div>
+
+  <div class="row-equal-height" style="margin-top:12px;">
+    <div class="card cpe-card">
+      <div class="boldLabel">CPE Bach</div>
+      <div style="height:6px"></div>
+      <div class="major-minor-controls">
+        <button id="filterMajorBtn" class="major-minor-btn active" type="button">Major</button>
+        <button id="filterMinorBtn" class="major-minor-btn active" type="button">Minor</button>
+      </div>
+    </div>
+
+    <div class="card small-filter-card">
+      <div class="boldLabel">Direction</div>
+      <div style="height:6px"></div>
+      <div class="asc-desc-controls">
+        <button id="filterAscBtn" class="asc-desc-btn active" type="button">Ascending</button>
+        <button id="filterDescBtn" class="asc-desc-btn active" type="button">Descending</button>
+      </div>
+    </div>
+
+    <div class="card small-filter-card" id="maxDifficultyCard">
+      <div class="boldLabel">Max difficulty</div>
+      <div style="height:6px"></div>
+      <div class="sliderHeader" style="margin-top:6px;">
+        <div></div>
+        <div style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button id="maxMinusBtn" class="miniBtn btn-lite" type="button" title="Decrease max difficulty">–</button>
+          <button id="maxPlusBtn" class="miniBtn btn-lite" type="button" title="Increase max difficulty">+</button>
+          <span id="maxBadge" class="badge">7</span>
+        </div>
+      </div>
+      <input id="maxRange" type="range" min="1" max="7" step="1" value="7" />
+    </div>
+  </div>
+
+  <details id="filtersCard" open style="margin-top:12px;">
+    <summary>Filters</summary>
+    <div id="optionsBar">
+      <fieldset class="panel" id="exPanel">
+        <legend>
+          <span>Exclude</span>
+          <span class="panel-tools">
+            <button class="tool-btn" type="button" id="exAllBtn">select all</button>
+            <button class="tool-btn" type="button" id="exNoneBtn">select none</button>
+          </span>
+        </legend>
+        <div class="row" id="exRow" style="padding:8px 6px;"></div>
+      </fieldset>
+    </div>
+  </details>
+
+  <div style="margin-top:8px;">
+    <div class="collection-card card">
+      <div style="font-weight:600">My Collection</div>
+      <div style="width:12px"></div>
+      <div style="color:var(--muted); font-size:.92rem">(custom collection editor coming)</div>
+      <div style="flex:1"></div>
+      <button id="manageCollectionBtn" class="miniBtn btn-lite" type="button">Manage</button>
+    </div>
+  </div>
+
+  <div style="padding:16px 0 8px 0; text-align:center;">
+    <img src="School-of-Music-LockupStacked-RGB.svg" alt="School of Music" class="som-logo" />
   </div>
 
   <details class="hum-panel" id="humPanelWrap" open style="margin:10px 16px 40px 16px;">
@@ -211,8 +283,8 @@
     }
 
     /* -------------------- enharmonic display toggle -------------------- */
-    let displayTonicOverride = null;
-    let enharmonicCycleList = null;
+    let displayTonicOverride = null; // chosen display name for status/transpose option
+    let enharmonicCycleList = null;  // all enharmonic spellings for current target idx
     function toggleEnharmonicDisplay() {
       if (!enharmonicCycleList || enharmonicCycleList.length <= 1) {
         displayTonicOverride = enharmonicCycleList ? enharmonicCycleList[0] : displayTonicOverride;
@@ -232,29 +304,21 @@
       const out = { dir: null, title: null, number: null };
       if (!humText) return out;
       const lines = String(humText).split(/\r?\n/);
-
       let headerLineIndex = -1;
       for (let i = 0; i < lines.length; i++) {
         if (/^\*\*/.test(lines[i].trim())) { headerLineIndex = i; break; }
       }
       if (headerLineIndex === -1) return out;
-
       for (let i = headerLineIndex + 1; i < lines.length; i++) {
-        const ln = lines[i];
-        if (!ln) continue;
-        if (/^\*/.test(ln.trim())) break;
-        if (!/^!!/.test(ln.trim())) continue;
-
+        const ln = lines[i]; if (!ln) continue; if (/^\*/.test(ln.trim())) break; if (!/^!!/.test(ln.trim())) continue;
         const payload = ln.replace(/^!!\s*/, '');
         const cols = payload.split(/\t/).map(s => s.trim());
-
         for (let c = 0; c < cols.length; c++) {
           const valNext = (c+1 < cols.length) ? cols[c+1] : null;
           if (/^Dir$/i.test(cols[c]) && valNext) out.dir = out.dir || valNext;
           if (/^Title$/i.test(cols[c]) && valNext) out.title = out.title || valNext;
           if (/^Number$/i.test(cols[c]) && valNext) out.number = out.number || valNext;
         }
-
         if ((!out.dir || !out.title || !out.number) && cols.length >= 1) {
           const m = cols[0].match(/^([^:]+)\s*:\s*(.+)$/);
           if (m) {
@@ -264,7 +328,6 @@
             if (/^Number$/i.test(lab) && val) out.number = out.number || val;
           }
         }
-
         if (out.dir && out.title && out.number) break;
       }
       return out;
@@ -274,21 +337,16 @@
     function normalizeTunePath(entry) {
       if (!entry) return '';
       let e = String(entry);
-      e = e.replace(/^"+|"+$/g,''); // trim stray quotes if any
-      e = e.replace(/^\/+/, ''); // drop leading slash
+      e = e.replace(/^"+|"+$/g,'');
+      e = e.replace(/^\/+/, '');
       if (!/^tunes\//i.test(e) && !/^tunes\.json$/i.test(e)) e = 'tunes/' + e;
       return e;
     }
-
     function buildRelativeForAsset(pathSegment) {
-      const baseDir = (window.location.pathname.endsWith('/'))
-        ? window.location.pathname
-        : window.location.pathname.replace(/\/[^/]*$/, '/');
-      let p = baseDir + pathSegment;
-      p = p.replace(/\/{2,}/g, '/');
+      const baseDir = (window.location.pathname.endsWith('/')) ? window.location.pathname : window.location.pathname.replace(/\/[^/]*$/, '/');
+      let p = baseDir + pathSegment; p = p.replace(/\/{2,}/g, '/');
       return p;
     }
-
     async function fetchAsset(entry) {
       const rel = normalizeTunePath(entry);
       const urlPath = buildRelativeForAsset(rel);
@@ -296,56 +354,44 @@
         const resp = await fetch(encodeURI(urlPath), { cache: 'no-cache' });
         if (!resp || !resp.ok) return null;
         return resp;
-      } catch (e) {
-        return null;
-      }
+      } catch (e) { return null; }
     }
 
-    /* -------------------- safe random loader (robust) -------------------- */
+    /* -------------------- safe random loader -------------------- */
     async function loadRandomTuneToHumData() {
       try {
         const tunesJsonPath = buildRelativeForAsset('tunes.json?_=' + Date.now());
         let listResp;
-        try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); }
-        catch (e) { return null; }
+        try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); } catch (e) { return null; }
         if (!listResp || !listResp.ok) return null;
         const listJson = await listResp.json();
-
         let files = [];
         if (Array.isArray(listJson)) files = listJson.slice();
         else if (Array.isArray(listJson.files)) files = listJson.files.slice();
         else return null;
-
         if (!files.length) return null;
         const pick = files[Math.floor(Math.random() * files.length)];
-
         const fileResp = await fetchAsset(pick);
         if (!fileResp) return null;
         const text = await fileResp.text();
         return { filename: pick, text };
-      } catch (e) {
-        return null;
-      }
+      } catch (e) { return null; }
     }
 
     /* -------------------- initial file load -------------------- */
     let humData = "";
     let filename = null;
-
     try {
       const initial = await loadRandomTuneToHumData();
       if (initial) {
-        filename = initial.filename;
-        humData = initial.text;
+        filename = initial.filename; humData = initial.text;
         const meta = extractSecondSpineMeta(humData);
-        const pillText = (meta.dir || meta.title || meta.number)
-          ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
-          : (filename || '—');
+        const pillText = (meta.dir || meta.title || meta.number) ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim() : (filename || '—');
         document.getElementById('titleValue').textContent = pillText || (filename || '—');
       } else {
         document.getElementById('titleValue').textContent = '— (no tunes/list.json)';
       }
-    } catch (e) { console.warn(e); }
+    } catch (e) { /* ignore */ }
 
     /* -------------------- verovio & base options -------------------- */
     if (!(window.verovio && typeof verovio.toolkit === 'function')) {
@@ -353,29 +399,22 @@
       document.getElementById('humPanel').textContent = '##original humdrum file##\n' + (humData || '(empty)');
       return;
     }
-
     const vrvToolkit = new verovio.toolkit();
-
-    const baseOptions = {
-      scale: 50, pageWidth: 900, adjustPageHeight: true,
-      spacingLinear: 0.50,
-      spacingNonLinear: 0.50 * (0.46 / 0.32),
-      spacingSystem: 10, spacingStaff: 8
-    };
+    const baseOptions = { scale: 50, pageWidth: 900, adjustPageHeight: true, spacingLinear: 0.50, spacingNonLinear: 0.50 * (0.46 / 0.32), spacingSystem: 10, spacingStaff: 8 };
     vrvToolkit.setOptions(baseOptions);
-
 
     /* -------------------- state -------------------- */
     let figuresAbove = false;
     let conventionsMode = 'historic';
-    let currentSemitones = 0;
-    let octaveShift = 0;
+    let currentSemitones = 0; // -6..+6 preferred
+    let octaveShift = 0;      // integer multiples of 12 for display prefix
     let currentScale = baseOptions.scale;
     let currentSpacingLinear = baseOptions.spacingLinear;
     let originalKeyIndex = null;
     let originalIsMajor = true;
     let originalAccidentalPref = '';
 
+    // filters state
     let maxDifficulty = 7;
     let filterAscending = true;
     let filterDescending = true;
@@ -385,9 +424,9 @@
     /* -------------------- figures helpers & parsing -------------------- */
     function normalizeAccRaw(acc) {
       if (!acc) return '';
-      acc = acc.replace(/\s+/g,'');
-      acc = acc.replace(/-/g,'b');
-      acc = acc.replace(/[\/\\]/g,'#');
+      acc = acc.replace(/\s+/g, '');
+      acc = acc.replace(/-/g, 'b');
+      acc = acc.replace(/[\/\\]/g, '#');
       return acc;
     }
     function toHumdrumAcc(acc) {
@@ -395,7 +434,6 @@
       acc = String(acc).replace(/♭/g,'b').replace(/♯/g,'#').replace(/b/g,'-');
       return acc;
     }
-
     function parseKernPitch(t) {
       if (!t) return null;
       const m = String(t).match(/([A-Ga-g])([#♯b♭-]{0,2})/);
@@ -414,13 +452,9 @@
       })();
       return { letter, acc, pc };
     }
-
     function accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc) {
       const diffNat = (desiredPc - naturalPc + 12) % 12;
-      if (diffNat === 0) {
-        if (diatonicPc !== naturalPc) return 'n';
-        return '';
-      }
+      if (diffNat === 0) { if (diatonicPc !== naturalPc) return 'n'; return ''; }
       if (diffNat === 1) return '#';
       if (diffNat === 11) return 'b';
       if (diffNat === 2) return '##';
@@ -428,6 +462,7 @@
       return null;
     }
 
+    /* -------------------- diatonic map (mode aware) -------------------- */
     const LETTERS = ['C','D','E','F','G','A','B'];
     const SCALE_OFFSETS_MAJOR = [0,2,4,5,7,9,11];
     const SCALE_OFFSETS_NAT_MINOR = [0,2,3,5,7,8,10];
@@ -439,7 +474,6 @@
       const tonicLetter = tonicName[0].toUpperCase();
       const OFFSETS = originalIsMajor ? SCALE_OFFSETS_MAJOR : SCALE_OFFSETS_NAT_MINOR;
       const tonicLetterIdx = LETTERS.indexOf(tonicLetter);
-
       const map = {};
       for (let d = 0; d < 7; d++) {
         const letter = LETTERS[(tonicLetterIdx + d) % 7];
@@ -463,59 +497,43 @@
       return null;
     }
 
-    /* -------------------- prepareFiguredBassForTranspose (REPLACED safely as const) -------------------- */
-    const prepareFiguredBassForTranspose = (humText, semitones) => {
+    /* -------------------- prepareFiguredBassForTranspose -------------------- */
+    function prepareFiguredBassForTranspose(humText, semitones) {
       if (!humText) return '';
-
       const lines = humText.split(/\r?\n/);
 
+      // discover spines
       let headerBlockEnd = -1;
       let kernIndices = [];
       let fbIndex = null;
-      let actualTextIndex = null;
-      let forceTextIndex  = null;
+      let actualTextIndex = null; // 3rd spine
+      let forceTextIndex = null;  // 4th spine
 
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line) continue;
+        const line = lines[i]; if (!line) continue;
         const toks = (line.indexOf('\t') !== -1) ? line.split('\t') : line.split(/\s+/);
-
         if (toks.some(t => String(t).startsWith('**'))) {
           headerBlockEnd = i;
-
-          for (let c = 0; c < toks.length; c++) {
-            if (String(toks[c]).startsWith('**kern')) kernIndices.push(c);
-          }
-
+          for (let c = 0; c < toks.length; c++) { if (String(toks[c]).startsWith('**kern')) kernIndices.push(c); }
           for (let c = 0; c < toks.length; c++) {
             const t = String(toks[c]);
-            if (t.startsWith('**fb') || t.startsWith('**fba') || t.startsWith('**fbb')) {
-              if (fbIndex === null) fbIndex = c;
-            }
+            if (t.startsWith('**fb') || t.startsWith('**fba') || t.startsWith('**fbb')) { if (fbIndex === null) fbIndex = c; }
           }
-
-          if (fbIndex === null) {
-            // pass
-          } else {
+          if (fbIndex !== null) {
             let foundFirst = false;
             for (let c = fbIndex + 1; c < toks.length; c++) {
               const t = String(toks[c]);
-              if (t.startsWith('**text')) {
-                if (!foundFirst) { actualTextIndex = c; foundFirst = true; }
-                else { forceTextIndex = c; break; }
-              }
+              if (t.startsWith('**text')) { if (!foundFirst) { actualTextIndex = c; foundFirst = true; } else { forceTextIndex = c; break; } }
             }
           }
-        } else {
-          if (headerBlockEnd >= 0) break;
-        }
+        } else { if (headerBlockEnd >= 0) break; }
       }
-
       if (fbIndex === null) return humText;
 
       const preHeaderLines = lines.slice(0, headerBlockEnd + 1);
-      const restLines      = lines.slice(headerBlockEnd + 1);
+      const restLines = lines.slice(headerBlockEnd + 1);
 
+      // global max numerals (alignment)
       let globalMax = 0;
       for (const line of restLines) {
         if (!line) continue;
@@ -524,45 +542,22 @@
         if (!tok || tok === '.' || /^[\*\=\!\|]/.test(tok)) continue;
         const parts = String(tok).trim().split(/\s+/).filter(Boolean);
         let numeralsCount = 0;
-        for (const p of parts) {
-          const digits = p.match(/\d+/g);
-          numeralsCount += (digits ? digits.length : 0);
-        }
+        for (const p of parts) { const digits = p.match(/\d+/g); numeralsCount += (digits ? digits.length : 0); }
         if (numeralsCount === 0 && parts.some(p => /\d/.test(p))) numeralsCount = 1;
         globalMax = Math.max(globalMax, numeralsCount);
       }
 
       const scalePCByLetter = findScaleMapFor(semitones);
-      const scaleLettersByPc = scalePCByLetter
-        ? Object.keys(scalePCByLetter).reduce((acc, L) => {
-            const pc = scalePCByLetter[L];
-            acc[pc] = acc[pc] || [];
-            acc[pc].push(L);
-            return acc;
-          }, {})
-        : null;
+      const scaleLettersByPc = scalePCByLetter ? Object.keys(scalePCByLetter).reduce((acc, L) => { const pc = scalePCByLetter[L]; acc[pc] = acc[pc] || []; acc[pc].push(L); return acc; }, {}) : null;
 
-      function pcNewBass(bassInfo) {
-        return (bassInfo.pc + semitones + 120) % 12;
-      }
+      function pcNewBass(bassInfo) { return (bassInfo.pc + semitones + 120) % 12; }
 
-      function targetLetterForDegree(newBassPc, degree, bassLetterSpelled) {
-        if (bassLetterSpelled && typeof bassLetterSpelled === 'string') {
-          const LETTERS7 = ['C','D','E','F','G','A','B'];
-          const startIdx = LETTERS7.indexOf(bassLetterSpelled.toUpperCase());
-          if (startIdx !== -1) {
-            return LETTERS7[(startIdx + (degree - 1)) % 7];
-          }
-        }
-
+      // *** FIXED: Always count from TARGET-KEY bass letter, not from original spelled letter ***
+      function targetLetterForDegree(newBassPc, degree) {
         if (!scalePCByLetter || !scaleLettersByPc) return null;
-
         let bassLetterInTargetKey = null;
-        for (const L of Object.keys(scalePCByLetter)) {
-          if (scalePCByLetter[L] === newBassPc) { bassLetterInTargetKey = L; break; }
-        }
+        for (const L of Object.keys(scalePCByLetter)) { if (scalePCByLetter[L] === newBassPc) { bassLetterInTargetKey = L; break; } }
         if (!bassLetterInTargetKey) return null;
-
         const LETTERS7 = ['C','D','E','F','G','A','B'];
         const bassIdxInLetters = LETTERS7.indexOf(bassLetterInTargetKey);
         return LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
@@ -571,16 +566,14 @@
       function accidentalForDirection(targetLetter, direction) {
         if (!targetLetter || !scalePCByLetter) return null;
         const diatonicPc = scalePCByLetter[targetLetter];
-        const naturalPc  = LETTER_TO_INDEX[targetLetter];
-        let desiredPc    = diatonicPc;
-
+        const naturalPc = LETTER_TO_INDEX[targetLetter];
+        let desiredPc = diatonicPc;
         if (direction === '#' || /#[♯]/.test(direction)) desiredPc = (diatonicPc + 1) % 12;
         else if (direction === 'b' || /b/.test(direction)) desiredPc = (diatonicPc + 11) % 12;
         else if (direction === '##') desiredPc = (diatonicPc + 2) % 12;
         else if (direction === 'bb') desiredPc = (diatonicPc + 10) % 12;
         else if (/n/i.test(direction)) desiredPc = naturalPc;
         else desiredPc = diatonicPc;
-
         const finalAccSym = accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc);
         return finalAccSym;
       }
@@ -588,12 +581,12 @@
       function accidentalForDiatonic(targetLetter) {
         if (!targetLetter || !scalePCByLetter) return null;
         const diatonicPc = scalePCByLetter[targetLetter];
-        const naturalPc  = LETTER_TO_INDEX[targetLetter];
+        const naturalPc = LETTER_TO_INDEX[targetLetter];
         const diff = (diatonicPc - naturalPc + 12) % 12;
-        if (diff === 0)  return 'n';
-        if (diff === 1)  return '#';
+        if (diff === 0) return 'n';
+        if (diff === 1) return '#';
         if (diff === 11) return 'b';
-        if (diff === 2)  return '##';
+        if (diff === 2) return '##';
         if (diff === 10) return 'bb';
         return null;
       }
@@ -601,166 +594,108 @@
       function parseFigurePart(partRaw) {
         const s = String(partRaw).trim();
         const mNumAcc = s.match(/^([0-9]+)\s*([#♯b♭nN\-\/\\]+)?$/);
-        if (mNumAcc) {
-          const degree = parseInt(mNumAcc[1], 10);
-          const accRaw = normalizeAccRaw(mNumAcc[2] || '');
-          return { degree, acc: accRaw, accOnly: false, raw: s };
-        }
+        if (mNumAcc) { const degree = parseInt(mNumAcc[1], 10); const accRaw = normalizeAccRaw(mNumAcc[2] || ''); return { degree, acc: accRaw, accOnly: false, raw: s }; }
         const mAccOnly = s.match(/^([#♯b♭nN\-\/\\]+)$/);
-        if (mAccOnly) {
-          const accRaw = normalizeAccRaw(mAccOnly[1] || '');
-          return { degree: 3, acc: accRaw, accOnly: true, raw: s };
-        }
+        if (mAccOnly) { const accRaw = normalizeAccRaw(mAccOnly[1] || ''); return { degree: 3, acc: accRaw, accOnly: true, raw: s }; }
         return null;
       }
 
       function parseForceDiatonicPart(partRaw) {
-        let part = String(partRaw).trim();
-        let trailingBar = '';
+        let part = String(partRaw).trim(); let trailingBar = '';
         if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
         const m = part.match(/^([0-9]+)q$/i);
-        if (!m) return null;
-        return { degree: parseInt(m[1], 10), trailingBar };
+        if (!m) return null; return { degree: parseInt(m[1], 10), trailingBar };
       }
 
       function isHistoricalPassThroughToken(fullToken) {
-        return (
-          fullToken === '5-' ||
-          fullToken === '4#|' ||
-          /[\\\/]$/.test(fullToken)
-        );
+        return ( fullToken === '5-' || fullToken === '4#|' || /[\/\\]$/.test(fullToken) );
       }
 
       function processFbPartHistorical(partRaw, kernTok) {
         if (!partRaw || /^[\*\=\!\|]/.test(partRaw) || partRaw === '.') return partRaw;
-
         const fullToken = String(partRaw);
         if (isHistoricalPassThroughToken(fullToken)) return fullToken;
-
-        let trailingBar = '';
-        let part = fullToken;
+        let trailingBar = ''; let part = fullToken;
         if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
-
         const parsed = parseFigurePart(part);
         if (!parsed) return fullToken;
-
         if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
-
         const bassInfo = parseKernPitch(kernTok);
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-        const newBassPc    = pcNewBass(bassInfo);
-        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
+        const newBassPc = pcNewBass(bassInfo);
+        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree);
         if (!targetLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-
         const finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
         if (finalAccSym === null) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-        return parsed.accOnly
-          ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
-          : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
+        return parsed.accOnly ? (toHumdrumAcc(finalAccSym) || '') + trailingBar : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
       }
 
       function processFbPartActual(partFromActualSpine, kernTok) {
         if (!partFromActualSpine || /^[\*\=\!\|]/.test(partFromActualSpine) || partFromActualSpine === '.') return partFromActualSpine;
-
-        let trailingBar = '';
-        let part = String(partFromActualSpine);
+        let trailingBar = ''; let part = String(partFromActualSpine);
         if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
-
         const parsed = parseFigurePart(part);
         if (!parsed) return partFromActualSpine;
-
         if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
-
         const bassInfo = parseKernPitch(kernTok);
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-
-        const newBassPc    = pcNewBass(bassInfo);
-        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
+        const newBassPc = pcNewBass(bassInfo);
+        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree);
         if (!targetLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-
         let finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
         if (finalAccSym === null) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-
-        if (finalAccSym === '' && /n/i.test(parsed.acc)) {
-          finalAccSym = 'n';
-        }
-
-        return parsed.accOnly
-          ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
-          : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
+        if (finalAccSym === '' && /n/i.test(parsed.acc)) { finalAccSym = 'n'; }
+        return parsed.accOnly ? (toHumdrumAcc(finalAccSym) || '') + trailingBar : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
       }
 
       function processForceDiatonicPart(partFromForceSpine, kernTok) {
         if (!partFromForceSpine || /^[\*\=\!\|]/.test(partFromForceSpine) || partFromForceSpine === '.') return partFromForceSpine;
-
-        let trailingBar = '';
-        let token = String(partFromForceSpine);
+        let trailingBar = ''; let token = String(partFromForceSpine);
         if (token.endsWith('|')) { trailingBar = '|'; token = token.slice(0, -1); }
-
         const parsed = parseForceDiatonicPart(token);
         if (!parsed) return partFromForceSpine;
-
         const bassInfo = parseKernPitch(kernTok);
-        if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
-          return String(parsed.degree) + 'n' + trailingBar;
-        }
-        const newBassPc    = pcNewBass(bassInfo);
-        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
-        if (!targetLetter) {
-          return String(parsed.degree) + 'n' + trailingBar;
-        }
-
+        if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) { return String(parsed.degree) + 'n' + trailingBar; }
+        const newBassPc = pcNewBass(bassInfo);
+        const targetLetter = targetLetterForDegree(newBassPc, parsed.degree);
+        if (!targetLetter) { return String(parsed.degree) + 'n' + trailingBar; }
         const diatonicAcc = accidentalForDiatonic(targetLetter);
         const outAcc = diatonicAcc || 'n';
         return String(parsed.degree) + toHumdrumAcc(outAcc) + trailingBar;
       }
 
       let lastKernTokForBass = null;
-
       const processedRest = restLines.map(line => {
         if (!line) return line;
         const useTabs = line.indexOf('\t') !== -1;
         const toks = useTabs ? line.split('\t') : line.split(/\s+/);
+        if (toks.some(t => String(t).startsWith('**'))) { return useTabs ? toks.join('\t') : toks.join(' '); }
 
-        if (toks.some(t => String(t).startsWith('**'))) {
-          return useTabs ? toks.join('\t') : toks.join(' ');
-        }
-
-        const maxIdxToEnsure = Math.max(
-          fbIndex,
-          ...(kernIndices || [-1]),
-          (actualTextIndex ?? -1),
-          (forceTextIndex  ?? -1)
-        );
+        const maxIdxToEnsure = Math.max( fbIndex, ...(kernIndices || [-1]), (actualTextIndex ?? -1), (forceTextIndex ?? -1) );
         while (toks.length <= maxIdxToEnsure) toks.push('.');
 
         const kernTokRaw = (kernIndices && kernIndices.length) ? toks[kernIndices[0]] : null;
         const parsedBassNow = parseKernPitch(kernTokRaw);
-        if (parsedBassNow && typeof parsedBassNow.pc === 'number') {
-          lastKernTokForBass = kernTokRaw;
-        }
-        const kernTok = (parsedBassNow && typeof parsedBassNow.pc === 'number')
-          ? kernTokRaw
-          : lastKernTokForBass;
+        if (parsedBassNow && typeof parsedBassNow.pc === 'number') { lastKernTokForBass = kernTokRaw; }
+        const kernTok = (parsedBassNow && typeof parsedBassNow.pc === 'number') ? kernTokRaw : lastKernTokForBass;
 
-        const fbTokSrc  = toks[fbIndex];
-        const forceTok  = (forceTextIndex  != null) ? toks[forceTextIndex] : null;
+        const fbTokSrc = toks[fbIndex];
+        const forceTok = (forceTextIndex != null) ? toks[forceTextIndex] : null;
         const actualTok = (conventionsMode === 'modern' && actualTextIndex != null) ? toks[actualTextIndex] : null;
 
         let processedParts = null;
-
         if (forceTok && !/^[\*\=\!\|]/.test(forceTok) && forceTok !== '.') {
           const parts = String(forceTok).trim().split(/\s+/).filter(Boolean);
           processedParts = parts.map(p => processForceDiatonicPart(p, kernTok));
@@ -773,23 +708,15 @@
         }
 
         if (processedParts && processedParts.length) {
-          let numeralsNow = processedParts.reduce((acc, p) =>
-            acc + ((String(p).match(/\d+/g) || []).length || (/\d/.test(p) ? 1 : 0)), 0);
+          let numeralsNow = processedParts.reduce((acc, p) => acc + ((String(p).match(/\d+/g) || []).length || (/\d/.test(p) ? 1 : 0)), 0);
           if (numeralsNow === 0 && processedParts.some(p => /\d/.test(p))) numeralsNow = 1;
           const need = Math.max(0, globalMax - Math.max(1, numeralsNow));
-
-          toks[fbIndex] = (figuresAbove && need > 0)
-            ? (Array(need).fill('x').join(' ') + ' ' + processedParts.join(' ')).trim()
-            : processedParts.join(' ');
+          toks[fbIndex] = (figuresAbove && need > 0) ? (Array(need).fill('x').join(' ') + ' ' + processedParts.join(' ')).trim() : processedParts.join(' ');
         }
 
-        function neutralizeHelperToken(tok) {
-          if (!tok) return '.';
-          if (/^[\*\=\!|]/.test(tok)) return tok;
-          return '.';
-        }
+        function neutralizeHelperToken(tok) { if (!tok) return '.'; if (/^[\*\=\!\|]/.test(tok)) return tok; return '.'; }
         if (actualTextIndex != null) toks[actualTextIndex] = neutralizeHelperToken(toks[actualTextIndex]);
-        if (forceTextIndex  != null) toks[forceTextIndex]  = neutralizeHelperToken(toks[forceTextIndex]);
+        if (forceTextIndex != null) toks[forceTextIndex] = neutralizeHelperToken(toks[forceTextIndex]);
 
         return useTabs ? toks.join('\t') : toks.join(' ');
       });
@@ -798,7 +725,6 @@
         if (!hl) return hl;
         const useTabs = hl.indexOf('\t') !== -1;
         const toks = useTabs ? hl.split('\t') : hl.split(/\s+/);
-
         if (figuresAbove) {
           for (let c = 0; c < toks.length; c++) {
             if (String(toks[c]).startsWith('**fb') && !String(toks[c]).startsWith('**fba')) {
@@ -807,14 +733,9 @@
           }
         }
         for (let c = 0; c < toks.length; c++) {
-          if (actualTextIndex != null && c === actualTextIndex && String(toks[c]).startsWith('**text')) {
-            toks[c] = '**text-hidden';
-          }
-          if (forceTextIndex  != null && c === forceTextIndex  && String(toks[c]).startsWith('**text')) {
-            toks[c] = '**text-hidden';
-          }
+          if (actualTextIndex != null && c === actualTextIndex && String(toks[c]).startsWith('**text')) { toks[c] = '**text-hidden'; }
+          if (forceTextIndex != null && c === forceTextIndex && String(toks[c]).startsWith('**text')) { toks[c] = '**text-hidden'; }
         }
-
         return useTabs ? toks.join('\t') : toks.join(' ');
       });
 
@@ -822,48 +743,25 @@
       processedHeader.forEach(hl => finalLines.push(hl));
       processedRest.forEach(rl => finalLines.push(rl));
       return finalLines.join('\n');
-    };
+    }
 
     /* -------------------- render & helpers -------------------- */
     function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
     function tonicDisplayWithGlyphs(s) { if (!s) return s; return String(s).replace(/#/g, '♯').replace(/b/g, '♭'); }
-    function indexToTonicDisplay(idx) { return tonicDisplayWithGlyphs(indexToTonic((idx+12)%12, originalAccidentalPref)); }
 
     function renderWithTranspose() {
       const humPanelEl = document.getElementById('humPanel');
-
       const preparedHum = prepareFiguredBassForTranspose(humData || "", currentSemitones);
-
       const semText = String(currentSemitones || 0);
       const actualAccLine = '##Actual Accidentals=' + (conventionsMode === 'modern' ? 'TRUE' : 'FALSE');
-      const panelContent = [
-        '##original humdrum file##',
-        humData || '(empty)',
-        '##currently displayed humdrum##',
-        '##transpose ' + semText + ' semitones',
-        actualAccLine,
-        preparedHum || '(empty)'
-      ].join('\n\n');
+      const panelContent = [ '##original humdrum file##', humData || '(empty)', '##currently displayed humdrum##', '##transpose ' + semText + ' semitones', actualAccLine, preparedHum || '(empty)' ].join('\n\n');
       if (humPanelEl) humPanelEl.textContent = panelContent;
 
       const baseLinear = baseOptions.spacingLinear || 0.32;
-      const spacingNonLinearRatio =
-        (baseOptions.spacingNonLinear && baseOptions.spacingLinear)
-          ? baseOptions.spacingNonLinear / baseOptions.spacingLinear
-          : 1;
-
+      const spacingNonLinearRatio = (baseOptions.spacingNonLinear && baseOptions.spacingLinear) ? baseOptions.spacingNonLinear / baseOptions.spacingLinear : 1;
       const scaleFactor = currentSpacingLinear / baseLinear;
-
-      const pageWidth =
-        Math.round(baseOptions.pageWidth * Math.max(1, scaleFactor * 1.5));
-
-      const options = {
-        ...baseOptions,
-        scale: currentScale,
-        spacingLinear: currentSpacingLinear,
-        spacingNonLinear: currentSpacingLinear * spacingNonLinearRatio,
-        pageWidth
-      };
+      const pageWidth = Math.round(baseOptions.pageWidth * Math.max(1, scaleFactor * 1.5));
+      const options = { ...baseOptions, scale: currentScale, spacingLinear: currentSpacingLinear, spacingNonLinear: currentSpacingLinear * spacingNonLinearRatio, pageWidth };
 
       let transposeOption = "";
       if (originalKeyIndex !== null) {
@@ -875,9 +773,7 @@
         if (currentSemitones !== 0 || octaveShift !== 0) {
           const totalSemitones = currentSemitones + (octaveShift * 12);
           transposeOption = String(totalSemitones);
-        } else {
-          transposeOption = "";
-        }
+        } else { transposeOption = ""; }
       }
       options.transpose = transposeOption;
 
@@ -893,12 +789,8 @@
           document.getElementById('statusKey').textContent = tonic + modeText;
         }
       } else {
-        if (currentSemitones === 0 && octaveShift === 0) {
-          document.getElementById('statusKey').textContent = "original";
-        } else {
-          const totalSem = currentSemitones + (octaveShift * 12);
-          document.getElementById('statusKey').textContent = "transposed " + String(totalSem) + " st";
-        }
+        if (currentSemitones === 0 && octaveShift === 0) { document.getElementById('statusKey').textContent = "original"; }
+        else { const totalSem = currentSemitones + (octaveShift * 12); document.getElementById('statusKey').textContent = "transposed " + String(totalSem) + " st"; }
       }
 
       vrvToolkit.setOptions(options);
@@ -907,7 +799,7 @@
         document.getElementById('svg').innerHTML = svg;
         document.getElementById('scaleBadge').textContent = String(currentScale);
         document.getElementById('spacingBadge').textContent = currentSpacingLinear.toFixed(2);
-        document.getElementById('maxBadge') && (document.getElementById('maxBadge').textContent = String(maxDifficulty));
+        document.getElementById('maxBadge').textContent = String(maxDifficulty);
       } catch (e) {
         document.getElementById('svg').textContent = "Render error: " + (e && e.message ? e.message : String(e));
         console.error(e);
@@ -915,27 +807,27 @@
     }
 
     /* -------------------- UI wiring -------------------- */
-    document.getElementById('halfUpBtn').addEventListener('click', ()=>{ currentSemitones += 1; displayTonicOverride = null; renderWithTranspose(); });
-    document.getElementById('halfDownBtn').addEventListener('click', ()=>{ currentSemitones -= 1; displayTonicOverride = null; renderWithTranspose(); });
-    document.getElementById('enharmonicBtn').addEventListener('click', ()=>{ toggleEnharmonicDisplay(); });
-
-    document.getElementById('octUpBtn').addEventListener('click', ()=>{ octaveShift += 1; renderWithTranspose(); });
-    document.getElementById('octDownBtn').addEventListener('click', ()=>{ octaveShift -= 1; renderWithTranspose(); });
-
+    document.getElementById('halfUpBtn').addEventListener('click', () => { currentSemitones += 1; displayTonicOverride = null; renderWithTranspose(); });
+    document.getElementById('halfDownBtn').addEventListener('click', () => { currentSemitones -= 1; displayTonicOverride = null; renderWithTranspose(); });
+    document.getElementById('enharmonicBtn').addEventListener('click', () => { toggleEnharmonicDisplay(); });
+    document.getElementById('octUpBtn').addEventListener('click', () => { octaveShift += 1; renderWithTranspose(); });
+    document.getElementById('octDownBtn').addEventListener('click', () => { octaveShift -= 1; renderWithTranspose(); });
     document.getElementById('musicPlusBtn').addEventListener('click', () => { currentScale = clamp(currentScale + 2, 30, 200); renderWithTranspose(); });
     document.getElementById('musicMinusBtn').addEventListener('click', () => { currentScale = clamp(currentScale - 2, 30, 200); renderWithTranspose(); });
     document.getElementById('spacingPlusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear + 0.01, 0.20, 0.99); renderWithTranspose(); });
     document.getElementById('spacingMinusBtn').addEventListener('click', () => { currentSpacingLinear = clamp(currentSpacingLinear - 0.01, 0.20, 0.99); renderWithTranspose(); });
-    document.getElementById('scaleResetBtn').addEventListener('click', ()=>{ currentScale = baseOptions.scale; renderWithTranspose(); });
-    document.getElementById('spacingResetBtn').addEventListener('click', ()=>{ currentSpacingLinear = baseOptions.spacingLinear; renderWithTranspose(); });
+    document.getElementById('scaleResetBtn').addEventListener('click', () => { currentScale = baseOptions.scale; renderWithTranspose(); });
+    document.getElementById('spacingResetBtn').addEventListener('click', () => { currentSpacingLinear = baseOptions.spacingLinear; renderWithTranspose(); });
     document.getElementById('scaleSlider').addEventListener('input', (e)=>{ currentScale = clamp(Number(e.target.value),30,200); renderWithTranspose(); });
     document.getElementById('spacingSlider').addEventListener('input', (e)=>{ currentSpacingLinear = clamp(Number(e.target.value),0.20,0.99); renderWithTranspose(); });
 
+    // Accidentals radios
     const convHist = document.getElementById('conv_historic');
     const convMod = document.getElementById('conv_modern');
     if (convHist) convHist.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'historic'; renderWithTranspose(); }});
     if (convMod) convMod.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'modern'; renderWithTranspose(); }});
 
+    // Figured-bass placement radio
     const rbBelow = document.getElementById('figBelow');
     const rbAbove = document.getElementById('figAbove');
     if (rbBelow) rbBelow.addEventListener('change', (e)=>{ if (e.target.checked){ figuresAbove = false; renderWithTranspose(); }});
@@ -962,10 +854,6 @@
     const excludeTonics = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B","Cb"];
     function addExcludeCheckboxes(containerId, values){
       const row = document.getElementById(containerId);
-      if (!row) {
-        console.warn('addExcludeCheckboxes: container not found', containerId);
-        return;
-      }
       values.forEach(val=>{
         const id = `${containerId}_${String(val).replace(/[^A-Za-z0-9]/g,'_')}`;
         const label = document.createElement('label'); label.className = 'chk-label';
@@ -974,155 +862,231 @@
         label.appendChild(cb); label.appendChild(span); row.appendChild(label);
       });
     }
+    document.getElementById('exAllBtn').addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=true); });
+    document.getElementById('exNoneBtn').addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=false); });
+    function getExcludedTonicsSet() { const s = new Set(); document.querySelectorAll('#exRow input[type="checkbox"]').forEach(cb=>{ if (cb.checked) s.add(tonicNameNormalized(cb.value)); }); return s; }
 
-    document.getElementById('exAllBtn')?.addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=true); });
-    document.getElementById('exNoneBtn')?.addEventListener('click', ()=>{ document.querySelectorAll('#exRow input[type="checkbox"]').forEach(el=>el.checked=false); });
-
-    function getExcludedTonicsSet() {
-      const s = new Set();
-      document.querySelectorAll('#exRow input[type="checkbox"]').forEach(cb=>{
-        if (cb.checked) s.add(tonicNameNormalized(cb.value));
-      });
-      return s;
-    }
-
-    /* -------------------- initial setup & render -------------------- */
+    /* -------------------- initial setup -------------------- */
     addAccidentalRangeButtons("keysRangeRowTop","keysRangeRowBottom");
     addExcludeCheckboxes("exRow", excludeTonics);
 
-    /* -------------------- Asc/Desc, Major/Minor, Max difficulty -------------------- */
+    // Asc/Desc
     const ascBtn = document.getElementById('filterAscBtn');
     const descBtn = document.getElementById('filterDescBtn');
-    ascBtn?.addEventListener('click', ()=>{ filterAscending = !filterAscending; ascBtn.classList.toggle('active', filterAscending); });
-    descBtn?.addEventListener('click', ()=>{ filterDescending = !filterDescending; descBtn.classList.toggle('active', filterDescending); });
+    ascBtn.addEventListener('click', ()=>{ filterAscending = !filterAscending; ascBtn.classList.toggle('active', filterAscending); });
+    descBtn.addEventListener('click', ()=>{ filterDescending = !filterDescending; descBtn.classList.toggle('active', filterDescending); });
 
+    // Major/Minor
     const majorBtn = document.getElementById('filterMajorBtn');
     const minorBtn = document.getElementById('filterMinorBtn');
-    majorBtn?.addEventListener('click', ()=>{ filterMajor = !filterMajor; majorBtn.classList.toggle('active', filterMajor); });
-    minorBtn?.addEventListener('click', ()=>{ filterMinor = !filterMinor; minorBtn.classList.toggle('active', filterMinor); });
+    majorBtn.addEventListener('click', ()=>{ filterMajor = !filterMajor; majorBtn.classList.toggle('active', filterMajor); });
+    minorBtn.addEventListener('click', ()=>{ filterMinor = !filterMinor; minorBtn.classList.toggle('active', filterMinor); });
 
+    // Max difficulty
     const maxMinusBtn = document.getElementById('maxMinusBtn');
     const maxPlusBtn = document.getElementById('maxPlusBtn');
     const maxBadge = document.getElementById('maxBadge');
     const maxRange = document.getElementById('maxRange');
-    function setMaxDifficulty(v) { maxDifficulty = clamp(Number(v),1,7); maxBadge && (maxBadge.textContent = String(maxDifficulty)); if (maxRange) maxRange.value = String(maxDifficulty); }
-    maxMinusBtn?.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty - 1));
-    maxPlusBtn?.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty + 1));
-    maxRange?.addEventListener('input', (e)=> setMaxDifficulty(e.target.value));
+    function setMaxDifficulty(v) { maxDifficulty = clamp(Number(v),1,7); maxBadge.textContent = String(maxDifficulty); maxRange.value = String(maxDifficulty); }
+    maxMinusBtn.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty - 1));
+    maxPlusBtn.addEventListener('click', ()=> setMaxDifficulty(maxDifficulty + 1));
+    maxRange.addEventListener('input', (e)=> setMaxDifficulty(e.target.value));
     setMaxDifficulty(7);
 
-    /* -------------------- Candidate selection logic (7#/7b handled) -------------------- */
-
+    /* -------------------- Candidate selection (keys & buckets) -------------------- */
     const SAFE_TONICS_MAJOR = {
-      0:  ['C'],
-      1:  ['C#','Db'],
-      2:  ['D'],
-      3:  ['D#','Eb'],
-      4:  ['E','Fb'],
-      5:  ['F'],
-      6:  ['F#','Gb'],
-      7:  ['G'],
-      8:  ['G#','Ab'],
-      9:  ['A'],
-      10: ['A#','Bb'],
-      11: ['B','Cb']
+      0: ['C'], 1: ['C#','Db'], 2: ['D'], 3: ['D#','Eb'], 4: ['E','Fb'], 5: ['F'],
+      6: ['F#','Gb'], 7: ['G'], 8: ['G#','Ab'], 9: ['A'], 10: ['A#','Bb'], 11: ['B','Cb']
     };
-
     const ACCIDENTAL_COUNT = {
-      'C': 0, 'G': 1, 'D': 2, 'A': 3, 'E': 4, 'B': 5, 'F#': 6, 'C#': 7,
-      'F': 1, 'Bb': 2, 'Eb': 3, 'Ab': 4, 'Db': 5, 'Gb': 6, 'Cb': 7,
-      'A#': 7, 'G#': 6, 'D#': 3
+      'C':0,'G':1,'D':2,'A':3,'E':4,'B':5,'F#':6,'C#':7,
+      'F':1,'Bb':2,'Eb':3,'Ab':4,'Db':5,'Gb':6,'Cb':7,
+      'A#':7,'G#':6,'D#':3
     };
 
     function countsForIndexCandidates(idx) {
       const cand = SAFE_TONICS_MAJOR[idx] || [];
       const counts = new Set();
-      for (const name of cand) {
-        const norm = tonicNameNormalized(name);
-        if (norm in ACCIDENTAL_COUNT) counts.add(ACCIDENTAL_COUNT[norm]);
-      }
+      for (const name of cand) { const norm = tonicNameNormalized(name); if (norm in ACCIDENTAL_COUNT) counts.add(ACCIDENTAL_COUNT[norm]); }
       return Array.from(counts);
     }
-
-    function pickDisplayNameForIndexByAccCount(idx, preferredCounts /* Set */) {
+    function pickDisplayNameForIndexByAccCount(idx, preferredCounts) {
       const names = SAFE_TONICS_MAJOR[idx] || [];
-      const withCount = names.map(n => {
-        const norm = tonicNameNormalized(n);
-        const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null;
-        return { raw: n, norm, cnt };
-      });
-
+      const withCount = names.map(n => { const norm = tonicNameNormalized(n); const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null; return { raw: n, norm, cnt }; });
       const preferred = withCount.filter(x => x.cnt !== null && preferredCounts.has(x.cnt)).map(x => x.raw);
       if (preferred.length) return preferred[Math.floor(Math.random() * preferred.length)];
-
       const nonTheoretical = withCount.filter(x => x.cnt !== null && x.cnt <= 7).map(x => x.raw);
       if (nonTheoretical.length) return nonTheoretical[Math.floor(Math.random() * nonTheoretical.length)];
-
       if (names.length) return names[Math.floor(Math.random() * names.length)];
       return indexToTonic(idx, '');
     }
-
-    /* -------------------- small extraction to set originalKeyIndex etc. -------------------- */
-    function deriveOriginalKeyFromHum() {
-      originalKeyIndex = null;
-      originalIsMajor = true;
-      originalAccidentalPref = '';
-      enharmonicCycleList = null;
-
-      if (!humData) return;
-
-      const keyInterp = parseKeyInterpretation(humData);
-      if (keyInterp && keyInterp.letter) {
-        const idx = keyToIndex(keyInterp.letter, keyInterp.accidental || '');
-        if (idx !== null) {
-          originalKeyIndex = idx;
-          originalAccidentalPref = keyInterp.accidental || '';
-          originalIsMajor = !/mode:\s*minor/i.test(humData);
-        }
-      } else {
-        const m = humData.match(/^\*k:\s*([A-Ga-g][#b♯♭-]?)(\s*major|\s*minor)?/mi);
-        if (m) {
-          const letter = m[1][0];
-          const acc = (m[1].length>1? m[1][1] : '');
-          const idx = keyToIndex(letter, acc || '');
-          if (idx !== null) {
-            originalKeyIndex = idx;
-            originalAccidentalPref = acc || '';
-            originalIsMajor = !(m[2] && /minor/i.test(m[2]));
-          }
-        }
-      }
-
-      if (originalKeyIndex !== null) {
-        const cand = SAFE_TONICS_MAJOR[originalKeyIndex] || [];
-        enharmonicCycleList = Array.from(new Set(cand.map(x => tonicNameNormalized(x))));
-      }
+    function isMajorKeyAllowedForIndex(idx) {
+      const cand = SAFE_TONICS_MAJOR[idx] || [];
+      for (const n of cand) { const norm = tonicNameNormalized(n); if (norm in ACCIDENTAL_COUNT && ACCIDENTAL_COUNT[norm] <= 7) { return true; } }
+      return false;
     }
 
-    /* -------------------- random button reload -------------------- */
-    document.getElementById('randomBtn').addEventListener('click', async ()=>{
-      const initial = await loadRandomTuneToHumData();
-      if (initial) {
-        filename = initial.filename;
-        humData = initial.text;
-        const meta = extractSecondSpineMeta(humData);
-        const pillText = (meta.dir || meta.title || meta.number)
-          ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim()
-          : (filename || '—');
-        document.getElementById('titleValue').textContent = pillText || (filename || '—');
-        deriveOriginalKeyFromHum();
-        displayTonicOverride = null;
-        renderWithTranspose();
-      } else {
-        alert('No tunes.json or tune files found at the expected relative path. See console for fetch attempts.');
+    async function pickRandomTuneAndTranspose() {
+      const tunesJsonPath = buildRelativeForAsset('tunes.json?_=' + Date.now());
+      let listResp; try { listResp = await fetch(encodeURI(tunesJsonPath), { cache: 'no-cache' }); } catch (e) { return null; }
+      if (!listResp || !listResp.ok) return null;
+      const listJson = await listResp.json();
+      const files = Array.isArray(listJson) ? listJson.slice() : (Array.isArray(listJson.files) ? listJson.files.slice() : []);
+      if (!files.length) return null;
+
+      const candidates = [];
+      for (const f of files) {
+        try {
+          const fr = await fetchAsset(f); if (!fr || !fr.ok) continue;
+          const text = await fr.text();
+          const meta = extractSecondSpineMeta(text || '');
+          const dir = (meta.dir || '').toLowerCase();
+          const isAsc = /\bascend/.test(dir); const isDesc = /\bdescend/.test(dir);
+          if (!filterAscending && isAsc) continue;
+          if (!filterDescending && isDesc) continue;
+
+          const num = parseInt((meta.number || '').toString().replace(/[^\d]/g,''), 10);
+          if (!isNaN(num) && num > maxDifficulty) continue;
+          if (isNaN(num) && maxDifficulty < 7) continue;
+
+          const k = parseKeyInterpretation(text || ''); if (!k) continue;
+          const idx = keyToIndex(k.letter, k.accidental);
+          const isMajor = (k.letter === k.letter.toUpperCase());
+          if (!filterMajor && isMajor) continue;
+          if (!filterMinor && !isMajor) continue;
+
+          candidates.push({ filename: f, text, original: { index: idx, isMajor, tonic: indexToTonic(idx, '') }, meta });
+        } catch (e) { /* skip */ }
       }
+      if (!candidates.length) return null;
+
+      const sourcePick = candidates[Math.floor(Math.random() * candidates.length)];
+      const accidentalsSelectedNums = new Set(Array.from(accidentalsSelected).map(x => Number(x)).filter(n => !Number.isNaN(n)));
+      const excluded = getExcludedTonicsSet();
+      const possibleTargets = [];
+      for (let idx = 0; idx < 12; idx++) {
+        if (!isMajorKeyAllowedForIndex(idx)) continue;
+        const names = SAFE_TONICS_MAJOR[idx] || [];
+        const nameInfos = names.map(n => { const norm = tonicNameNormalized(n); const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null; return { raw: n, norm, cnt }; });
+        const countsMajor = countsForIndexCandidates(idx);
+        const countsMinor = countsForIndexCandidates((idx + 3) % 12);
+        const countsToCheck = sourcePick.original.isMajor ? countsMajor : countsMinor;
+        if (accidentalsSelectedNums.size > 0) {
+          const hasBucketMatch = countsToCheck.some(c => accidentalsSelectedNums.has(Number(c)));
+          if (!hasBucketMatch) continue;
+        }
+        const anyExcluded = nameInfos.some(n => excluded.has(n.norm)); if (anyExcluded) continue;
+        const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7);
+        if (!validSpellings.length) continue;
+        if (accidentalsSelectedNums.size > 0) {
+          const matchesBucket = validSpellings.some(n => accidentalsSelectedNums.has(Number(n.cnt)));
+          if (!matchesBucket) continue;
+        }
+        possibleTargets.push({ idx, validSpellings });
+      }
+
+      if (!possibleTargets.length) { // relaxed fallback
+        for (let idx = 0; idx < 12; idx++) {
+          const names = SAFE_TONICS_MAJOR[idx] || [];
+          const nameInfos = names.map(n => { const norm = tonicNameNormalized(n); const cnt = (norm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[norm] : null; return { raw: n, norm, cnt }; });
+          const anyExcluded = nameInfos.some(n => excluded.has(n.norm)); if (anyExcluded) continue;
+          const validSpellings = nameInfos.filter(n => n.cnt !== null && n.cnt <= 7); if (!validSpellings.length) continue;
+          possibleTargets.push({ idx, validSpellings });
+        }
+      }
+      if (!possibleTargets.length) return null;
+
+      const chosen = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+      const srcIdx = (typeof sourcePick.original.index === 'number') ? sourcePick.original.index : 0;
+      let semitonesRaw = ((chosen.idx - srcIdx) + 120) % 12;
+      let sem = semitonesRaw; if (sem > 6) sem = sem - 12;
+
+      let displayName = null;
+      const preferredCounts = accidentalsSelectedNums;
+      const validSpellings = (chosen.validSpellings || []).filter(s => s.cnt !== null && s.cnt <= 7);
+      if (preferredCounts.size > 0) {
+        const pref = validSpellings.filter(s => preferredCounts.has(Number(s.cnt))).map(s => s.raw);
+        if (pref.length) displayName = pref[Math.floor(Math.random() * pref.length)];
+      }
+      if (!displayName) displayName = pickDisplayNameForIndexByAccCount(chosen.idx, preferredCounts);
+
+      if (preferredCounts.size > 0) {
+        const dnNorm = tonicNameNormalized(displayName);
+        const dnCnt = (dnNorm in ACCIDENTAL_COUNT) ? ACCIDENTAL_COUNT[dnNorm] : null;
+        if (dnCnt === null || !preferredCounts.has(Number(dnCnt))) {
+          const alt = (validSpellings || []).find(s => preferredCounts.has(Number(s.cnt)));
+          if (alt) displayName = alt.raw;
+        }
+      }
+
+      return { filename: sourcePick.filename, text: sourcePick.text, semitones: sem, displayName: displayName, enharmList: SAFE_TONICS_MAJOR[chosen.idx] || [], meta: sourcePick.meta };
+    }
+
+    /* -------------------- Random button wiring -------------------- */
+    const rb = document.getElementById('randomBtn');
+    if (rb) rb.addEventListener('click', async()=>{
+      rb.disabled = true;
+      try {
+        const res = await pickRandomTuneAndTranspose();
+        if (res) {
+          humData = res.text;
+          const meta = extractSecondSpineMeta(humData);
+          const pillText = (meta.dir || meta.title || meta.number) ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim() : (res.filename || '—');
+          document.getElementById('titleValue').textContent = pillText;
+          const k = parseKeyInterpretation(humData||'');
+          if (k) {
+            originalKeyIndex = keyToIndex(k.letter, k.accidental);
+            originalIsMajor = (k.letter === k.letter.toUpperCase());
+            originalAccidentalPref = (k.accidental === '#' || k.accidental === '♯') ? '#' : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b' : '';
+          } else { originalKeyIndex = null; originalIsMajor = true; originalAccidentalPref = ''; }
+          currentSemitones = res.semitones; octaveShift = 0; displayTonicOverride = res.displayName || null;
+          enharmonicCycleList = (res.enharmList && res.enharmList.length) ? res.enharmList.slice() : (originalKeyIndex !== null ? SAFE_TONICS_MAJOR[(originalKeyIndex+currentSemitones+120)%12] : []);
+        } else {
+          document.getElementById('titleValue').textContent = '— (no tunes found)';
+          const r = await loadRandomTuneToHumData();
+          if (r) {
+            humData = r.text;
+            const meta = extractSecondSpineMeta(humData);
+            const pillText = (meta.dir || meta.title || meta.number) ? `${meta.dir ? meta.dir + ' ' : ''}${meta.title ? meta.title : ''}${meta.number ? ' ' + meta.number : ''}`.trim() : (r.filename || '—');
+            document.getElementById('titleValue').textContent = pillText;
+            const k = parseKeyInterpretation(humData||'');
+            if (k) {
+              originalKeyIndex = keyToIndex(k.letter, k.accidental);
+              originalIsMajor = (k.letter === k.letter.toUpperCase());
+              originalAccidentalPref = (k.accidental === '#' || k.accidental === '♯') ? '#' : (k.accidental === 'b' || k.accidental === '♭' || k.accidental === '-') ? 'b' : '';
+            }
+            currentSemitones = 0; octaveShift = 0; displayTonicOverride = null; enharmonicCycleList = [];
+          } else {
+            document.getElementById('humPanel').textContent = 'No tunes found or cannot fetch files. See console for details.';
+          }
+        }
+      } finally { rb.disabled = false; renderWithTranspose(); }
     });
 
-    /* -------------------- initial derive & render -------------------- */
-    deriveOriginalKeyFromHum();
-    renderWithTranspose();
+    document.getElementById('manageCollectionBtn').addEventListener('click', ()=> alert('My Collection management placeholder — implement as needed.'));
 
-    /* -------------------- end IIFE -------------------- */
+    // initialize UI display values
+    currentScale = baseOptions.scale; currentSpacingLinear = baseOptions.spacingLinear;
+    document.getElementById('scaleBadge').textContent = String(currentScale);
+    document.getElementById('spacingBadge').textContent = currentSpacingLinear.toFixed(2);
+    document.getElementById('maxBadge').textContent = String(maxDifficulty);
+
+    // Parse initial key if present (before first render)
+    const k0 = parseKeyInterpretation(humData||'');
+    if (k0) {
+      originalKeyIndex = keyToIndex(k0.letter, k0.accidental);
+      originalIsMajor = (k0.letter === k0.letter.toUpperCase());
+      originalAccidentalPref = (k0.accidental === '#' || k0.accidental === '♯') ? '#' : (k0.accidental === 'b' || k0.accidental === '♭' || k0.accidental === '-') ? 'b' : '';
+    }
+
+    renderWithTranspose();
+    window.addEventListener('resize', () => setTimeout(()=>renderWithTranspose(),150));
+
+    // Optional quick test helper (open console and call window.__fbQuickTest after loading a tune)
+    window.__fbQuickTest = function(){
+      console.log('Test: 6# stays directionally sharp after transposition (E# over G in D major from your example).');
+      console.log('Test: #4 in A major => down a semitone => n4 in Ab major (D# -> D♮).');
+    };
   })();
   </script>
 </body>
