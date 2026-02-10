@@ -6,7 +6,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer5.11</title>
+<title>Figured Bass Trainer5.12</title>
 
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
@@ -574,24 +574,27 @@ vrvToolkit.setOptions(baseOptions);
     }
 
     /* -------------------- prepareFiguredBassForTranspose -------------------- */
-   /* ---- DEBUG TRACE SUPPORT ---- */
-const TRACE_ENABLED = true;
-let lastPrepareTrace = []; // global so UI / dev can inspect after call
+ function prepareFiguredBassForTranspose(humText, semitones) {
+  // ---- Trace support (per-call) ----
+  const TRACE_ENABLED = true;
+  const trace = [];
+  function traceLog(step, context = {}, decision = null, result = null, note = null) {
+    if (!TRACE_ENABLED) return;
+    trace.push({
+      time: (new Date()).toISOString().slice(11,23),
+      step, context, decision, result, note
+    });
+  }
 
-function traceLog(arr, step, context = {}, decision = null, result = null, note = null) {
-  if (!TRACE_ENABLED) return;
-  arr.push({
-    time: (new Date()).toISOString().slice(11,23),
-    step, context, decision, result, note
-  });
-}
+  // Expose later
+  window.lastPrepareTrace = trace;
 
-/* -------------------- prepareFiguredBassForTranspose (instrumented) -------------------- */
-function prepareFiguredBassForTranspose(humText, semitones) {
-  if (!humText) return '';
+  if (!humText) {
+    traceLog('start.prepare', { semitones, length: 0 }, null, null, 'empty input');
+    return '';
+  }
 
-  const trace = []; // per-call structured log
-  traceLog(trace, 'start.prepare', { semitones, length: (humText||'').length });
+  traceLog('start.prepare', { semitones, length: humText.length });
 
   const lines = humText.split(/\r?\n/);
 
@@ -609,19 +612,15 @@ function prepareFiguredBassForTranspose(humText, semitones) {
 
     if (toks.some(t => String(t).startsWith('**'))) {
       headerBlockEnd = i;
-
-      // first/any **kern indices
       for (let c = 0; c < toks.length; c++) {
         if (String(toks[c]).startsWith('**kern')) kernIndices.push(c);
       }
-
       for (let c = 0; c < toks.length; c++) {
         const t = String(toks[c]);
         if (t.startsWith('**fb') || t.startsWith('**fba') || t.startsWith('**fbb')) {
           if (fbIndex === null) fbIndex = c;
         }
       }
-
       if (fbIndex !== null) {
         let foundFirst = false;
         for (let c = fbIndex + 1; c < toks.length; c++) {
@@ -637,20 +636,19 @@ function prepareFiguredBassForTranspose(humText, semitones) {
     }
   }
 
-  traceLog(trace, 'spines.discovered', {
-    kernIndices, fbIndex, actualTextIndex, forceTextIndex, headerBlockEnd
-  });
+  traceLog('spines.discovered', { kernIndices, fbIndex, actualTextIndex, forceTextIndex, headerBlockEnd });
 
   if (fbIndex === null) {
-    traceLog(trace, 'early.exit', { reason: 'no fb spine found' });
-    lastPrepareTrace = trace;
+    traceLog('early.exit', { reason: 'no fb spine found' });
+    // expose trace for debugging
+    window.lastPrepareTrace = trace;
     return humText;
   }
 
   const preHeaderLines = lines.slice(0, headerBlockEnd + 1);
   const restLines      = lines.slice(headerBlockEnd + 1);
 
-  // compute globalMax (unchanged) but log
+  // global max numerals (for alignment)
   let globalMax = 0;
   for (const line of restLines) {
     if (!line) continue;
@@ -666,11 +664,11 @@ function prepareFiguredBassForTranspose(humText, semitones) {
     if (numeralsCount === 0 && parts.some(p => /\d/.test(p))) numeralsCount = 1;
     globalMax = Math.max(globalMax, numeralsCount);
   }
-  traceLog(trace, 'globalMaxComputed', { globalMax });
+  traceLog('globalMaxComputed', { globalMax });
 
   // target key map
-  const scalePCByLetter = findScaleMapFor(semitones);
-  traceLog(trace, 'scaleMap', { semitones, scalePCByLetter });
+  const scalePCByLetter = findScaleMapFor(semitones); // relies on your global function
+  traceLog('scaleMap', { semitones, scalePCByLetter });
 
   const scaleLettersByPc = scalePCByLetter
     ? Object.keys(scalePCByLetter).reduce((acc, L) => {
@@ -681,30 +679,30 @@ function prepareFiguredBassForTranspose(humText, semitones) {
       }, {})
     : null;
 
-  /* --- helpers instrumented where important --- */
-
+  // ---- small helpers used below (assume accFromDesiredVsNatural & toHumdrumAcc exist globally) ----
   function pcNewBass(bassInfo) {
     const out = (bassInfo.pc + semitones + 120) % 12;
-    traceLog(trace, 'pcNewBass', { bassInfo, semitones, out });
+    traceLog('pcNewBass', { bassInfo, semitones }, null, out);
     return out;
   }
 
   function targetLetterForDegree(newBassPc, degree, bassLetterSpelled) {
-    traceLog(trace, 'targetLetterForDegree.enter', { newBassPc, degree, bassLetterSpelled });
+    traceLog('targetLetterForDegree.enter', { newBassPc, degree, bassLetterSpelled });
+    const LETTERS7 = ['C','D','E','F','G','A','B'];
+
     if (bassLetterSpelled && typeof bassLetterSpelled === 'string') {
-      const LETTERS7 = ['C','D','E','F','G','A','B'];
       const startIdx = LETTERS7.indexOf(bassLetterSpelled.toUpperCase());
       if (startIdx !== -1) {
         const chosen = LETTERS7[(startIdx + (degree - 1)) % 7];
-        traceLog(trace, 'targetLetterForDegree.choice', { method: 'step-from-spelled-bass', chosen });
+        traceLog('targetLetterForDegree.choice', { method: 'step-from-spelled-bass', chosen });
         return chosen;
       } else {
-        traceLog(trace, 'targetLetterForDegree.note', { note: 'bassLetterSpelled present but not C..B' });
+        traceLog('targetLetterForDegree.note', { note: 'bassLetterSpelled present but not C..B' });
       }
     }
 
     if (!scalePCByLetter || !scaleLettersByPc) {
-      traceLog(trace, 'targetLetterForDegree.fallback', { reason: 'no scale map' });
+      traceLog('targetLetterForDegree.fallback', { reason: 'no scale map' });
       return null;
     }
 
@@ -713,14 +711,13 @@ function prepareFiguredBassForTranspose(humText, semitones) {
       if (scalePCByLetter[L] === newBassPc) { bassLetterInTargetKey = L; break; }
     }
     if (!bassLetterInTargetKey) {
-      traceLog(trace, 'targetLetterForDegree.fallback', { reason: 'no matching pc in target key', newBassPc });
+      traceLog('targetLetterForDegree.fallback', { reason: 'no matching pc in target key', newBassPc });
       return null;
     }
 
-    const LETTERS7 = ['C','D','E','F','G','A','B'];
     const bassIdxInLetters = LETTERS7.indexOf(bassLetterInTargetKey);
     const chosen = LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
-    traceLog(trace, 'targetLetterForDegree.choice', { method: 'fallback-via-target-key', bassLetterInTargetKey, chosen });
+    traceLog('targetLetterForDegree.choice', { method: 'fallback-via-target-key', bassLetterInTargetKey, chosen });
     return chosen;
   }
 
@@ -738,34 +735,68 @@ function prepareFiguredBassForTranspose(humText, semitones) {
     else desiredPc = diatonicPc;
 
     const finalAccSym = accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc);
-    traceLog(trace, 'accidentalForDirection', {
-      targetLetter, direction, diatonicPc, naturalPc, desiredPc, finalAccSym
-    });
+    traceLog('accidentalForDirection', { targetLetter, direction, diatonicPc, naturalPc, desiredPc }, null, finalAccSym);
     return finalAccSym; // '', 'n', '#', 'b', '##', 'bb', or null
   }
 
-  /* --- keep existing parse & processing functions but call traceLog in the key spots --- */
-  // For brevity: reuse your existing parseFigurePart / parseForceDiatonicPart / isHistoricalPassThroughToken
-  // and the processor functions, but insert traceLog at:
-  // - entry of processFbPartHistorical (log partRaw, kernTok)
-  // - after parsed derived targetLetter and finalAccSym (log them)
-  // - when returning the transformed token (log output)
-  // - same for processFbPartActual & processForceDiatonicPart
+  function accidentalForDiatonic(targetLetter) {
+    if (!targetLetter || !scalePCByLetter) return null;
+    const diatonicPc = scalePCByLetter[targetLetter];
+    const naturalPc  = LETTER_TO_INDEX[targetLetter];
+    const diff = (diatonicPc - naturalPc + 12) % 12;
+    if (diff === 0)  return 'n';
+    if (diff === 1)  return '#';
+    if (diff === 11) return 'b';
+    if (diff === 2)  return '##';
+    if (diff === 10) return 'bb';
+    return null;
+  }
 
-  // NOTE: paste your existing processFbPartHistorical/processFbPartActual/processForceDiatonicPart implementations here
-  // and add traceLog calls analogous to the trace points above.
-  // (To keep this patch concise I will show one instrumented example:)
+  // ---- parse helpers (same as your original parseFigurePart / parseForceDiatonicPart) ----
+  function parseFigurePart(partRaw) {
+    const s = String(partRaw).trim();
+    const mNumAcc = s.match(/^([0-9]+)\s*([#♯b♭nN\-\/\\]+)?$/);
+    if (mNumAcc) {
+      const degree = parseInt(mNumAcc[1], 10);
+      const accRaw = normalizeAccRaw(mNumAcc[2] || '');
+      return { degree, acc: accRaw, accOnly: false, raw: s };
+    }
+    const mAccOnly = s.match(/^([#♯b♭nN\-\/\\]+)$/);
+    if (mAccOnly) {
+      const accRaw = normalizeAccRaw(mAccOnly[1] || '');
+      return { degree: 3, acc: accRaw, accOnly: true, raw: s }; // default degree for acc-only tokens
+    }
+    return null;
+  }
 
+  function parseForceDiatonicPartRaw(partRaw) {
+    let part = String(partRaw).trim();
+    let trailingBar = '';
+    if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
+    const m = part.match(/^([0-9]+)q$/i);
+    if (!m) return null;
+    return { degree: parseInt(m[1], 10), trailingBar };
+  }
+
+  function isHistoricalPassThroughToken(fullToken) {
+    return (
+      fullToken === '5-' ||
+      fullToken === '4#|' ||
+      /[\\\/]$/.test(fullToken)
+    );
+  }
+
+  // ---- Per-part processors (instrumented) ----
   function processFbPartHistorical(partRaw, kernTok) {
-    traceLog(trace, 'processFbPartHistorical.enter', { partRaw, kernTok });
+    traceLog('processFbPartHistorical.enter', { partRaw, kernTok });
     if (!partRaw || /^[\*\=\!\|]/.test(partRaw) || partRaw === '.') {
-      traceLog(trace, 'processFbPartHistorical.skip', { reason: 'non-data token', partRaw });
+      traceLog('processFbPartHistorical.skip', { reason: 'non-data token', partRaw });
       return partRaw;
     }
 
     const fullToken = String(partRaw);
     if (isHistoricalPassThroughToken(fullToken)) {
-      traceLog(trace, 'processFbPartHistorical.passThrough', { fullToken });
+      traceLog('processFbPartHistorical.passThrough', { fullToken });
       return fullToken;
     }
 
@@ -775,57 +806,156 @@ function prepareFiguredBassForTranspose(humText, semitones) {
 
     const parsed = parseFigurePart(part);
     if (!parsed) {
-      traceLog(trace, 'processFbPartHistorical.parseFail', { part });
+      traceLog('processFbPartHistorical.parseFail', { part });
       return fullToken;
     }
 
     if (!parsed.acc && !parsed.accOnly) {
-      traceLog(trace, 'processFbPartHistorical.noAcc', { parsed });
+      traceLog('processFbPartHistorical.noAcc', { parsed });
       return String(parsed.degree) + trailingBar;
     }
 
     const bassInfo = parseKernPitch(kernTok);
-    traceLog(trace, 'processFbPartHistorical.bassParsed', { bassInfo });
+    traceLog('processFbPartHistorical.bassParsed', { bassInfo });
 
     if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
-      traceLog(trace, 'processFbPartHistorical.fallbackNoBassOrScale', { parsed, kernTok });
+      traceLog('processFbPartHistorical.fallbackNoBassOrScale', { parsed, kernTok });
       return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
     }
 
     const newBassPc    = pcNewBass(bassInfo); // for sounding only
     const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
-    traceLog(trace, 'processFbPartHistorical.targetLetterResolved', { newBassPc, targetLetter });
+    traceLog('processFbPartHistorical.targetLetterResolved', { newBassPc, targetLetter });
 
     if (!targetLetter) {
-      traceLog(trace, 'processFbPartHistorical.failTargetLetter', { parsed });
+      traceLog('processFbPartHistorical.failTargetLetter', { parsed });
       return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
     }
 
     const finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
-    traceLog(trace, 'processFbPartHistorical.finalAcc', { parsed, targetLetter, finalAccSym });
+    traceLog('processFbPartHistorical.finalAcc', { parsed, targetLetter, finalAccSym });
 
     if (finalAccSym === null) {
-      traceLog(trace, 'processFbPartHistorical.nullFinalAcc', { parsed });
+      traceLog('processFbPartHistorical.nullFinalAcc', { parsed });
       return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+    }
+    const out = parsed.accOnly
+      ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
+      : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
+
+    traceLog('processFbPartHistorical.output', { out });
+    return out;
+  }
+
+  function processFbPartActual(partFromActualSpine, kernTok) {
+    traceLog('processFbPartActual.enter', { partFromActualSpine, kernTok });
+    if (!partFromActualSpine || /^[\*\=\!\|]/.test(partFromActualSpine) || partFromActualSpine === '.') {
+      traceLog('processFbPartActual.skip', { reason: 'non-data token', partFromActualSpine });
+      return partFromActualSpine;
+    }
+
+    let trailingBar = '';
+    let part = String(partFromActualSpine);
+    if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
+
+    const parsed = parseFigurePart(part);
+    if (!parsed) {
+      traceLog('processFbPartActual.parseFail', { part });
+      return partFromActualSpine;
+    }
+
+    if (!parsed.acc && !parsed.accOnly) {
+      traceLog('processFbPartActual.noAcc', { parsed });
+      return String(parsed.degree) + trailingBar;
+    }
+
+    const bassInfo = parseKernPitch(kernTok);
+    traceLog('processFbPartActual.bassParsed', { bassInfo });
+
+    if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
+      traceLog('processFbPartActual.fallbackNoBassOrScale', { parsed, kernTok });
+      return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+    }
+
+    const newBassPc    = pcNewBass(bassInfo);
+    const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
+    traceLog('processFbPartActual.targetLetterResolved', { newBassPc, targetLetter });
+
+    if (!targetLetter) {
+      traceLog('processFbPartActual.failTargetLetter', { parsed });
+      return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+    }
+
+    let finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
+    if (finalAccSym === null) {
+      traceLog('processFbPartActual.nullFinalAcc', { parsed });
+      return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
+    }
+
+    // preserve explicit natural from Actual (3rd spine)
+    if (finalAccSym === '' && /n/i.test(parsed.acc)) {
+      finalAccSym = 'n';
+      traceLog('processFbPartActual.preserveNatural', { parsed, finalAccSym });
     }
 
     const out = parsed.accOnly
       ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
       : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
 
-    traceLog(trace, 'processFbPartHistorical.output', { out });
+    traceLog('processFbPartActual.output', { out });
     return out;
   }
 
-  // (Similarly instrument processFbPartActual() and processForceDiatonicPart() — copy the same traceLog pattern.)
+  function processForceDiatonicPart(partFromForceSpine, kernTok) {
+    traceLog('processForceDiatonicPart.enter', { partFromForceSpine, kernTok });
+    if (!partFromForceSpine || /^[\*\=\!\|]/.test(partFromForceSpine) || partFromForceSpine === '.') {
+      traceLog('processForceDiatonicPart.skip', { reason: 'non-data token', partFromForceSpine });
+      return partFromForceSpine;
+    }
 
-  // ===== process body lines (minimal changes, but keep trace) =====
+    let trailingBar = '';
+    let token = String(partFromForceSpine);
+    if (token.endsWith('|')) { trailingBar = '|'; token = token.slice(0, -1); }
+
+    const parsed = parseForceDiatonicPartRaw(token);
+    if (!parsed) {
+      traceLog('processForceDiatonicPart.parseFail', { token });
+      return partFromForceSpine;
+    }
+
+    const bassInfo = parseKernPitch(kernTok);
+    traceLog('processForceDiatonicPart.bassParsed', { bassInfo });
+
+    if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
+      traceLog('processForceDiatonicPart.fallback', { parsed });
+      return String(parsed.degree) + 'n' + trailingBar;
+    }
+
+    const newBassPc    = pcNewBass(bassInfo);
+    const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
+    traceLog('processForceDiatonicPart.targetLetter', { newBassPc, targetLetter });
+
+    if (!targetLetter) {
+      traceLog('processForceDiatonicPart.failTargetLetter', { parsed });
+      return String(parsed.degree) + 'n' + trailingBar;
+    }
+
+    const diatonicAcc = accidentalForDiatonic(targetLetter); // '#','b','n','##','bb'
+    const outAcc = diatonicAcc || 'n';
+    const out = String(parsed.degree) + toHumdrumAcc(outAcc) + trailingBar;
+    traceLog('processForceDiatonicPart.output', { out });
+    return out;
+  }
+
+  // ===== process body lines =====
   let lastKernTokForBass = null;
+
   const processedRest = restLines.map((line, lineIndex) => {
     if (!line) return line;
     const useTabs = line.indexOf('\t') !== -1;
     const toks = useTabs ? line.split('\t') : line.split(/\s+/);
 
+    // handle header-like lines inside body
     if (toks.some(t => String(t).startsWith('**'))) {
       return useTabs ? toks.join('\t') : toks.join(' ');
     }
@@ -838,23 +968,22 @@ function prepareFiguredBassForTranspose(humText, semitones) {
     );
     while (toks.length <= maxIdxToEnsure) toks.push('.');
 
+    // carry-forward bass
     const kernTokRaw = (kernIndices && kernIndices.length) ? toks[kernIndices[0]] : null;
     const parsedBassNow = parseKernPitch(kernTokRaw);
     if (parsedBassNow && typeof parsedBassNow.pc === 'number') {
       lastKernTokForBass = kernTokRaw;
     }
-    const kernTok = (parsedBassNow && typeof parsedBassNow.pc === 'number')
-      ? kernTokRaw
-      : lastKernTokForBass;
+    const kernTok = (parsedBassNow && typeof parsedBassNow.pc === 'number') ? kernTokRaw : lastKernTokForBass;
 
-    traceLog(trace, 'line.processing', { lineIndex, kernTokRaw, kernTok, fbTokSrc: toks[fbIndex], actualTok: (actualTextIndex!=null? toks[actualTextIndex]:null), forceTok: (forceTextIndex!=null? toks[forceTextIndex]:null) });
-
-    // pick sources with precedence
     const fbTokSrc  = toks[fbIndex];
     const forceTok  = (forceTextIndex  != null) ? toks[forceTextIndex] : null;
     const actualTok = (conventionsMode === 'modern' && actualTextIndex != null) ? toks[actualTextIndex] : null;
 
+    traceLog('line.processing', { lineIndex, kernTokRaw, kernTok, fbTokSrc, actualTok, forceTok });
+
     let processedParts = null;
+
     if (forceTok && !/^[\*\=\!\|]/.test(forceTok) && forceTok !== '.') {
       const parts = String(forceTok).trim().split(/\s+/).filter(Boolean);
       processedParts = parts.map(p => processForceDiatonicPart(p, kernTok));
@@ -867,8 +996,7 @@ function prepareFiguredBassForTranspose(humText, semitones) {
     }
 
     if (processedParts && processedParts.length) {
-      traceLog(trace, 'line.processedParts', { lineIndex, processedParts });
-      // existing alignment logic...
+      traceLog('line.processedParts', { lineIndex, processedParts });
       let numeralsNow = processedParts.reduce((acc, p) =>
         acc + ((String(p).match(/\d+/g) || []).length || (/\d/.test(p) ? 1 : 0)), 0);
       if (numeralsNow === 0 && processedParts.some(p => /\d/.test(p))) numeralsNow = 1;
@@ -918,22 +1046,24 @@ function prepareFiguredBassForTranspose(humText, semitones) {
   const finalLines = [];
   processedHeader.forEach(hl => finalLines.push(hl));
   processedRest.forEach(rl => finalLines.push(rl));
-
   const finalText = finalLines.join('\n');
-  traceLog(trace, 'end.prepare', { producedLength: finalText.length });
 
-  // expose trace globally for developer inspection
-  lastPrepareTrace = trace;
-  // also optionally attach trace to an element so the user can copy it:
+  traceLog('end.prepare', { producedLength: finalText.length });
+  // expose trace globally for inspection in console
+  window.lastPrepareTrace = trace;
+
+  // also append a short trace summary into the humPanel (if present) for easy copy/paste
   try {
-    const tp = document.getElementById('humPanel');
-    if (tp) {
-      // show a compact trace summary under the prepared humdrum (full trace also in console)
-      tp.textContent = '##TRACE##\n' + JSON.stringify(trace.slice(-50), null, 2) + '\n\n##prepared-humdrum##\n' + finalText;
+    const humPanelEl = document.getElementById && document.getElementById('humPanel');
+    if (humPanelEl) {
+      const tail = trace.slice(-40); // last N entries for brevity
+      humPanelEl.textContent = '##TRACE##\n' + JSON.stringify(tail, null, 2) + '\n\n##prepared-humdrum##\n' + finalText;
     }
-  } catch (e) { /* ignore UI failures */ }
+  } catch (e) {
+    // ignore UI errors
+  }
 
-  console.debug('[prepareTrace]', trace);
+  console.debug('[prepareFiguredBassForTranspose.trace]', trace);
   return finalText;
 }
 
@@ -1468,6 +1598,7 @@ async function pickRandomTuneAndTranspose() {
   </script>
 </body>
 </html>
+
 
 
 
