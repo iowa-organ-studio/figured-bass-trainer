@@ -1,10 +1,9 @@
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer5</title>
+<title>Figured Bass Trainer6.1</title>
 
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
@@ -63,7 +62,7 @@
   #row4 { display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; align-items:flex-start; }
 
   .chip .label{ font-size:0.88rem; color:var(--muted); }
-  .chip .value{ font-weight:600; margin-left:6px; font-size:0.95rem; }
+  .chip .value{ font-weight:600; margin-left:6px; font-size:.95rem; }
 
   #figPlacementCard, .conventions-card { width:360px; min-width:260px; margin:8px 10px 0 0; padding:6px; display:inline-block; vertical-align:top; }
   #figPlacementCard fieldset, .conventions-card fieldset { border:0;margin:0;padding:0; }
@@ -540,18 +539,31 @@ vrvToolkit.setOptions(baseOptions);
     const SCALE_OFFSETS_MAJOR = [0,2,4,5,7,9,11];
     const SCALE_OFFSETS_NAT_MINOR = [0,2,3,5,7,8,10];
 
-    function findScaleMapFor(semitonesOffset) {
+    // UPDATED: accept an explicit spelled tonic name (like "Db" or "C#") to build the scale map.
+    function findScaleMapFor(semitonesOffset, displayTonicName = null) {
       if (typeof originalKeyIndex !== 'number' || originalKeyIndex === null) return null;
       const targetKeyIndex = (originalKeyIndex + semitonesOffset + 120) % 12;
-      const tonicName = indexToTonic(targetKeyIndex, originalAccidentalPref) || 'C';
+
+      // Prefer an explicit display tonic (if provided) over index-to-tonic heuristics:
+      const tonicName = displayTonicName
+        ? tonicNameNormalized(displayTonicName)
+        : indexToTonic(targetKeyIndex, originalAccidentalPref) || 'C';
       const tonicLetter = tonicName[0].toUpperCase();
       const OFFSETS = originalIsMajor ? SCALE_OFFSETS_MAJOR : SCALE_OFFSETS_NAT_MINOR;
       const tonicLetterIdx = LETTERS.indexOf(tonicLetter);
 
+      // compute tonic index from the spelled tonicName (so mapping uses intended spelling)
+      // tonicName may be "Db" or "C#" or "F" etc.
+      let tonicIdxForName = keyToIndex(tonicName[0], tonicName.slice(1) || '');
+      if (typeof tonicIdxForName !== 'number' || tonicIdxForName === null) {
+        // fallback to computed targetKeyIndex if parsing fails
+        tonicIdxForName = targetKeyIndex;
+      }
+
       const map = {};
       for (let d = 0; d < 7; d++) {
         const letter = LETTERS[(tonicLetterIdx + d) % 7];
-        const pc = (targetKeyIndex + OFFSETS[d]) % 12;
+        const pc = (tonicIdxForName + OFFSETS[d]) % 12;
         map[letter] = pc;
       }
       return map;
@@ -644,7 +656,8 @@ vrvToolkit.setOptions(baseOptions);
       }
 
       // --------- target key map (major / natural minor) ----------
-      const scalePCByLetter = findScaleMapFor(semitones);
+      // IMPORTANT: prefer current displayTonicOverride (spelled tonic) if set.
+      const scalePCByLetter = findScaleMapFor(semitones, displayTonicOverride || null);
       const scaleLettersByPc = scalePCByLetter
         ? Object.keys(scalePCByLetter).reduce((acc, L) => {
             const pc = scalePCByLetter[L];
@@ -666,6 +679,7 @@ vrvToolkit.setOptions(baseOptions);
        * from the spelled bass letter**. This preserves spelling semantics: C# -> counts from C, Db -> counts from D.
        *
        * If bassLetterSpelled is unavailable, fallback to the old behavior that finds a bass letter by matching pc.
+       * The fallback chooses the candidate letter that is closest to the spelled bass in letter-space when possible.
        */
       function targetLetterForDegree(newBassPc, degree, bassLetterSpelled) {
         // Prefer letter-stepping from spelled bass if provided
@@ -680,15 +694,47 @@ vrvToolkit.setOptions(baseOptions);
         // Fallback: find a letter in the target key whose diatonic pc matches newBassPc
         if (!scalePCByLetter || !scaleLettersByPc) return null;
 
-        let bassLetterInTargetKey = null;
+        // collect all letters in the target key that have the desired PC
+        const candidateLetters = [];
         for (const L of Object.keys(scalePCByLetter)) {
-          if (scalePCByLetter[L] === newBassPc) { bassLetterInTargetKey = L; break; }
+          if (scalePCByLetter[L] === newBassPc) candidateLetters.push(L);
         }
-        if (!bassLetterInTargetKey) return null;
+        if (candidateLetters.length === 0) return null;
 
-        const LETTERS7 = ['C','D','E','F','G','A','B'];
-        const bassIdxInLetters = LETTERS7.indexOf(bassLetterInTargetKey);
-        return LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
+        // If only one candidate, use it
+        if (candidateLetters.length === 1) {
+          const LETTERS7 = ['C','D','E','F','G','A','B'];
+          const bassIdxInLetters = LETTERS7.indexOf(candidateLetters[0]);
+          return LETTERS7[(bassIdxInLetters + (degree - 1)) % 7];
+        }
+
+        // If multiple candidates and we have the spelled bass, choose the candidate closest in letter-space to the spelled bass.
+        if (bassLetterSpelled) {
+          const LETTERS7 = ['C','D','E','F','G','A','B'];
+          const start = LETTERS7.indexOf(bassLetterSpelled.toUpperCase());
+          if (start !== -1) {
+            let best = candidateLetters[0];
+            let bestDist = 999;
+            for (const cand of candidateLetters) {
+              const candIdx = LETTERS7.indexOf(cand);
+              // compute forward distance (0..6); prefer small forward distances (preserves diatonic direction)
+              let dist = (candIdx - start + 7) % 7;
+              // smaller is better; tie-breaker: smaller absolute distance if needed
+              if (dist < bestDist) {
+                bestDist = dist;
+                best = cand;
+              }
+            }
+            const LETTERS7b = ['C','D','E','F','G','A','B'];
+            const bassIdxInLetters = LETTERS7b.indexOf(best);
+            return LETTERS7b[(bassIdxInLetters + (degree - 1)) % 7];
+          }
+        }
+
+        // Otherwise fallback to first candidate
+        const LETTERS7c = ['C','D','E','F','G','A','B'];
+        const bassIdxInLetters = LETTERS7c.indexOf(candidateLetters[0]);
+        return LETTERS7c[(bassIdxInLetters + (degree - 1)) % 7];
       }
 
       // PRINT ACCIDENTAL RELATIVE TO THE NATURAL LETTER (Step 6)
@@ -979,12 +1025,31 @@ vrvToolkit.setOptions(baseOptions);
 
       const semText = String(currentSemitones || 0);
       const actualAccLine = '##Actual Accidentals=' + (conventionsMode === 'modern' ? 'TRUE' : 'FALSE');
+
+      // Determine display key (what the UI thinks we transposed into)
+      let displayKeyText = 'original';
+      if (originalKeyIndex !== null) {
+        const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
+        const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
+        const tonic = tonicDisplayWithGlyphs(tonicRaw);
+        const modeText = originalIsMajor ? ' major' : ' minor';
+        displayKeyText = tonic + modeText;
+      } else {
+        if (currentSemitones === 0 && octaveShift === 0) {
+          displayKeyText = "original";
+        } else {
+          const totalSem = currentSemitones + (octaveShift * 12);
+          displayKeyText = "transposed " + String(totalSem) + " st";
+        }
+      }
+
       const panelContent = [
         '##original humdrum file##',
         humData || '(empty)',
         '##currently displayed humdrum##',
         '##transpose ' + semText + ' semitones',
         actualAccLine,
+        '##target display key: ' + displayKeyText,
         preparedHum || '(empty)'
       ].join('\n\n');
       if (humPanelEl) humPanelEl.textContent = panelContent;
@@ -1090,7 +1155,7 @@ const options = {
     // Accidentals radios
     const convHist = document.getElementById('conv_historic');
     const convMod = document.getElementById('conv_modern');
-    if (convHist) convHist.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'historic'; renderWithTranspose(); }});
+    if (convHist) convHist.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'historic'; renderWithTranspose(); }}); 
     if (convMod) convMod.addEventListener('change', (e)=>{ if (e.target.checked){ conventionsMode = 'modern'; renderWithTranspose(); }});
 
     // Figured-bass placement radio
@@ -1445,9 +1510,17 @@ async function pickRandomTuneAndTranspose() {
             originalAccidentalPref = '';
           }
 
+          // Set the chosen semitone shift and immediately decide on the display tonic spelling.
           currentSemitones = res.semitones;
           octaveShift = 0;
+
+          // Use the displayName from pickRandomTuneAndTranspose as the explicit spelled tonic override:
           displayTonicOverride = res.displayName || null;
+          // Also set accidental preference based on spelled display (helps indexToTonic fallbacks)
+          if (displayTonicOverride) {
+            originalAccidentalPref = (displayTonicOverride.includes('#') ? '#' : (/[b♭-]/.test(displayTonicOverride) ? 'b' : ''));
+          }
+
           enharmonicCycleList = (res.enharmList && res.enharmList.length) ? res.enharmList.slice() : (originalKeyIndex !== null ? SAFE_TONICS_MAJOR[(originalKeyIndex+currentSemitones+120)%12] : []);
         } else {
           console.warn('[randomBtn] no candidate found (res null)');
@@ -1496,12 +1569,3 @@ async function pickRandomTuneAndTranspose() {
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
