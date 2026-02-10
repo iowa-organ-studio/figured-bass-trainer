@@ -3,11 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Figured Bass Trainer 5-41</title>
+  <title>Figured Bass Trainer 5-43</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="/School-of-Music-LockupStacked-RGB.svg" type="image/svg+xml" />
-  <!-- These scripts should be present in the same folder or adjusted to your hosting paths -->
   <script src="verovio-toolkit-wasm.js"></script>
   <script src="verovio-toolkit-hum.js"></script>
 
@@ -111,6 +110,20 @@
         <button class="tool-btn" type="button" id="keysAllBtn">select all</button>
         <button class="tool-btn" type="button" id="keysNoneBtn">select none</button>
       </div>
+
+      <!-- Exclude tonics UI placed here for clarity -->
+      <div style="height:10px"></div>
+      <div id="excludeCard" class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div>Exclude tonics</div>
+          <div style="display:flex;gap:8px;">
+            <button id="exAllBtn" type="button" class="tool-btn">select all</button>
+            <button id="exNoneBtn" type="button" class="tool-btn">select none</button>
+          </div>
+        </div>
+        <div id="exRow" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+
     </div>
 
     <div id="stackCol">
@@ -137,7 +150,6 @@
             <span id="spacingBadge" class="badge">—</span>
           </div>
         </div>
-        <!-- max spacing increased to 0.50; default 0.32 -->
         <input id="spacingSlider" type="range" min="0.20" max="0.99" step="0.01" value="0.50" />
       </div>
     </div>
@@ -482,7 +494,9 @@
             }
           }
 
-          if (fbIndex !== null) {
+          if (fbIndex === null) {
+            // pass
+          } else {
             let foundFirst = false;
             for (let c = fbIndex + 1; c < toks.length; c++) {
               const t = String(toks[c]);
@@ -948,6 +962,10 @@
     const excludeTonics = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B","Cb"];
     function addExcludeCheckboxes(containerId, values){
       const row = document.getElementById(containerId);
+      if (!row) {
+        console.warn('addExcludeCheckboxes: container not found', containerId);
+        return;
+      }
       values.forEach(val=>{
         const id = `${containerId}_${String(val).replace(/[^A-Za-z0-9]/g,'_')}`;
         const label = document.createElement('label'); label.className = 'chk-label';
@@ -1059,11 +1077,9 @@
         if (idx !== null) {
           originalKeyIndex = idx;
           originalAccidentalPref = keyInterp.accidental || '';
-          // detect minor via common markers: look for "*MM" or text? As fallback, check presence of "mode: minor" meta
           originalIsMajor = !/mode:\s*minor/i.test(humData);
         }
       } else {
-        // try to detect key signature via *k: or *K:, common humdrum forms
         const m = humData.match(/^\*k:\s*([A-Ga-g][#b♯♭-]?)(\s*major|\s*minor)?/mi);
         if (m) {
           const letter = m[1][0];
@@ -1077,14 +1093,9 @@
         }
       }
 
-      // If we have a key, build a short enharmonic cycle candidate list for UI toggle
       if (originalKeyIndex !== null) {
         const cand = SAFE_TONICS_MAJOR[originalKeyIndex] || [];
         enharmonicCycleList = Array.from(new Set(cand.map(x => tonicNameNormalized(x))));
-        // prefer the canonical accidental based on ACCIDENTAL_COUNT if present
-        if (enharmonicCycleList.length > 1) {
-          // keep as-is for toggle
-        }
       }
     }
 
