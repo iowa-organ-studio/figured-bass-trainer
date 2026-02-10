@@ -1,9 +1,12 @@
+
+
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Figured Bass Trainer6.31</title>
+<title>Figured Bass Trainer5</title>
 
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
@@ -493,7 +496,7 @@ vrvToolkit.setOptions(baseOptions);
       if (!acc) return '';
       acc = acc.replace(/\s+/g, '');
       acc = acc.replace(/-/g, 'b');
-      acc = acc.replace(/[\/\\]/g,'#');
+      acc = acc.replace(/[\/\\]/g, '#');
       return acc;
     }
     function toHumdrumAcc(acc) {
@@ -521,38 +524,54 @@ vrvToolkit.setOptions(baseOptions);
       return { letter, acc, pc };
     }
 
-     // old: function accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc) { ... }
-    // REPLACEMENT: compute accidental relative to the *diatonic* pitch (not natural),
-    // but still emit 'n' when the desired pitch equals the letter's natural pitch while the diatonic differs.
     function accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc) {
-      // Normalize to 0..11
-      desiredPc = ((desiredPc % 12) + 12) % 12;
-      naturalPc = ((naturalPc % 12) + 12) % 12;
-      diatonicPc = ((diatonicPc % 12) + 12) % 12;
-
-      // If desired equals diatonic, no accidental needed.
-      if (desiredPc === diatonicPc) {
+      const diffNat = (desiredPc - naturalPc + 12) % 12;
+      if (diffNat === 0) {
+        if (diatonicPc !== naturalPc) return 'n';
         return '';
       }
-
-      // If desired equals the letter's natural pitch but diatonic is different, we need explicit 'n'.
-      if (desiredPc === naturalPc && diatonicPc !== naturalPc) {
-        return 'n';
-      }
-
-      // Determine minimal signed difference relative to the DIATONIC pitch (preferred reference).
-      let diff = (desiredPc - diatonicPc + 12) % 12;
-      if (diff > 6) diff -= 12; // now in -6..+6
-
-      if (diff === 1) return '#';
-      if (diff === -1) return 'b';
-      if (diff === 2) return '##';
-      if (diff === -2) return 'bb';
-
-      // If we get here, it's an unusual gap (>=3 semitones): return null to avoid guessing.
+      if (diffNat === 1) return '#';
+      if (diffNat === 11) return 'b';
+      if (diffNat === 2) return '##';
+      if (diffNat === 10) return 'bb';
       return null;
     }
 
+    /* -------------------- diatonic map (mode aware) -------------------- */
+    const LETTERS = ['C','D','E','F','G','A','B'];
+    const SCALE_OFFSETS_MAJOR = [0,2,4,5,7,9,11];
+    const SCALE_OFFSETS_NAT_MINOR = [0,2,3,5,7,8,10];
+
+    function findScaleMapFor(semitonesOffset) {
+      if (typeof originalKeyIndex !== 'number' || originalKeyIndex === null) return null;
+      const targetKeyIndex = (originalKeyIndex + semitonesOffset + 120) % 12;
+      const tonicName = indexToTonic(targetKeyIndex, originalAccidentalPref) || 'C';
+      const tonicLetter = tonicName[0].toUpperCase();
+      const OFFSETS = originalIsMajor ? SCALE_OFFSETS_MAJOR : SCALE_OFFSETS_NAT_MINOR;
+      const tonicLetterIdx = LETTERS.indexOf(tonicLetter);
+
+      const map = {};
+      for (let d = 0; d < 7; d++) {
+        const letter = LETTERS[(tonicLetterIdx + d) % 7];
+        const pc = (targetKeyIndex + OFFSETS[d]) % 12;
+        map[letter] = pc;
+      }
+      return map;
+    }
+
+    function parseKeyInterpretation(hum) {
+      const lines = hum.split(/\r?\n/);
+      for (let ln of lines) {
+        ln = ln.trim();
+        const m = ln.match(/^\*([A-Ga-g])([#b♯♭-]?)\s*:/);
+        if (m) {
+          let acc = m[2] || '';
+          if (acc === '-') acc = 'b';
+          return { letter: m[1], accidental: acc };
+        }
+      }
+      return null;
+    }
 
     /* -------------------- prepareFiguredBassForTranspose -------------------- */
     function prepareFiguredBassForTranspose(humText, semitones) {
@@ -742,138 +761,6 @@ vrvToolkit.setOptions(baseOptions);
 
       // ===== per-part processors =====
 
-      // ---- NEW HELPER: build an ORIGINAL scale map (if original key known) ----
-      // originalScalePCByLetter maps letters to pc for the SOURCE key (before transpose).
-      // We can use originalKeyIndex & originalIsMajor from outer scope (globals).
-      const ORIGINAL_OFFSETS = originalIsMajor ? SCALE_OFFSETS_MAJOR : SCALE_OFFSETS_NAT_MINOR;
-      const originalScalePCByLetter = (typeof originalKeyIndex === 'number' && originalKeyIndex !== null)
-        ? (function() {
-            const map = {};
-            // pick spelled tonic letter from the original key index if possible:
-            const originalTonicName = indexToTonic(originalKeyIndex, originalAccidentalPref) || 'C';
-            const tonicLetter = originalTonicName[0].toUpperCase();
-            const tonicLetterIdx = LETTERS.indexOf(tonicLetter);
-            for (let d = 0; d < 7; d++) {
-              const letter = LETTERS[(tonicLetterIdx + d) % 7];
-              map[letter] = (originalKeyIndex + ORIGINAL_OFFSETS[d]) % 12;
-            }
-            return map;
-          })()
-        : null;
-
-      /**
-       * Compute alteration offset (signed semitones) from the source (original)
-       * Example: if in the source the diatonic pitch class for the degree was X,
-       * and the actual desired sounding pitch was Y, return minimal signed offset:
-       *   Y - X -> reduce to range -6..+6 (prefer -2,-1,0,1,2)
-       *
-       * Returns: integer (e.g. -2, -1, 0, 1, 2) OR null if cannot determine
-       */
-      function computeAlterationOffsetFromSource(parsedAcc, degree, bassInfo) {
-        // If there is no explicit accidental token in the source (parsedAcc empty), treat as 0.
-        if (!parsedAcc || !bassInfo || typeof bassInfo.pc !== 'number') {
-          // parsedAcc might be empty string meaning "no chromatic info" -> return null so caller preserves numeral only
-          if (!parsedAcc) return null;
-          // otherwise fall through (but parsedAcc might be like '#' etc.)
-        }
-
-        // If we don't have originalScalePCByLetter, we cannot compute source diatonic pc robustly.
-        if (!originalScalePCByLetter) {
-          // as fallback: interpret parsedAcc symbol as +/-1 or +/-2 semitones
-          const norm = normalizeAccRaw(parsedAcc || '');
-          if (/^##?$/.test(norm)) return (norm.length === 2) ? +2 : +1;
-          if (/^bb?$/.test(norm)) return (norm.length === 2) ? -2 : -1;
-          if (/^n$/i.test(norm)) return 0;
-          return null;
-        }
-
-        // Determine the spelled source target letter by stepping diatonically from spelled bass
-        const sourceTargetLetter = targetLetterForDegree(bassInfo.pc, degree, bassInfo.letter);
-        if (!sourceTargetLetter) return null;
-
-        const sourceDiatonicPc = originalScalePCByLetter[sourceTargetLetter];
-        if (typeof sourceDiatonicPc !== 'number') return null;
-
-        // desired sounding pc in source: derive from parsedAcc if explicit, or if parsed.accOnly we must
-        // interpret it relative to the actual sounding pitch where possible. For historical fb (no actual spine),
-        // the token may be 6# meaning diatonic + 1.
-        // For a robust approach, compute desiredPc by applying the parsed acc to the diatonic pc.
-        let desiredPc;
-        const norm = normalizeAccRaw(parsedAcc || '');
-        if (!norm) {
-          // no alteration written -> same as diatonic
-          desiredPc = sourceDiatonicPc;
-        } else if (/^n$/i.test(norm)) {
-          desiredPc = LETTER_TO_INDEX[sourceTargetLetter]; // forced natural
-        } else if (norm === '#') {
-          desiredPc = (sourceDiatonicPc + 1) % 12;
-        } else if (norm === 'b') {
-          desiredPc = (sourceDiatonicPc + 11) % 12;
-        } else if (norm === '##') {
-          desiredPc = (sourceDiatonicPc + 2) % 12;
-        } else if (norm === 'bb') {
-          desiredPc = (sourceDiatonicPc + 10) % 12;
-        } else {
-          // fallback: try to guess from first char
-          if (norm[0] === '#') desiredPc = (sourceDiatonicPc + 1) % 12;
-          else if (norm[0] === 'b' || norm[0] === '-') desiredPc = (sourceDiatonicPc + 11) % 12;
-          else if (/n/i.test(norm[0])) desiredPc = LETTER_TO_INDEX[sourceTargetLetter];
-          else return null;
-        }
-
-        // compute minimal signed difference desiredPc - sourceDiatonicPc in -6..+6
-        let diff = (desiredPc - sourceDiatonicPc + 12) % 12;
-        if (diff > 6) diff = diff - 12;
-        return diff;
-      }
-
-      // PRINT ACCIDENTAL RELATIVE TO THE NATURAL LETTER (Step 6) — *unchanged* but we'll use it after applying offset
-      function accidentalForDesiredPc(targetLetter, desiredPc, allowNaturalPreserve) {
-        if (!targetLetter || !scalePCByLetter) return null;
-        const naturalPc  = LETTER_TO_INDEX[targetLetter];
-        const diatonicPc = scalePCByLetter[targetLetter]; // diatonic in target key
-        // now compare desiredPc to naturalPc (not diatonicPc) for final symbol
-        const finalAccSym = accFromDesiredVsNatural(desiredPc, naturalPc, diatonicPc);
-        // preserve explicit natural if requested (allowNaturalPreserve true and finalAccSym === '')
-        if (allowNaturalPreserve && finalAccSym === 'n') return 'n';
-        return finalAccSym;
-      }
-
-      function parseFigurePart(partRaw) {
-        const s = String(partRaw).trim();
-        const mNumAcc = s.match(/^([0-9]+)\s*([#♯b♭nN\-\/\\]+)?$/);
-        if (mNumAcc) {
-          const degree = parseInt(mNumAcc[1], 10);
-          const accRaw = normalizeAccRaw(mNumAcc[2] || '');
-          return { degree, acc: accRaw, accOnly: false, raw: s };
-        }
-        const mAccOnly = s.match(/^([#♯b♭nN\-\/\\]+)$/);
-        if (mAccOnly) {
-          const accRaw = normalizeAccRaw(mAccOnly[1] || '');
-          return { degree: 3, acc: accRaw, accOnly: true, raw: s }; // D2
-        }
-        return null;
-      }
-
-      function parseForceDiatonicPart(partRaw) {
-        let part = String(partRaw).trim();
-        let trailingBar = '';
-        if (part.endsWith('|')) { trailingBar = '|'; part = part.slice(0, -1); }
-        const m = part.match(/^([0-9]+)q$/i);
-        if (!m) return null;
-        return { degree: parseInt(m[1], 10), trailingBar };
-      }
-
-      function isHistoricalPassThroughToken(fullToken) {
-        return (
-          fullToken === '5-' ||
-          fullToken === '4#|' ||
-          /[\\\/]$/.test(fullToken) // slashed endings
-        );
-      }
-
-      // ===== per-part processors (reworked to preserve semitone offset from source) =====
-
       function processFbPartHistorical(partRaw, kernTok) {
         if (!partRaw || /^[\*\=\!\|]/.test(partRaw) || partRaw === '.') return partRaw;
 
@@ -890,35 +777,17 @@ vrvToolkit.setOptions(baseOptions);
         if (!parsed.acc && !parsed.accOnly) return String(parsed.degree) + trailingBar;
 
         const bassInfo = parseKernPitch(kernTok);
+        // IMPORTANT: use spelled bass letter for interval calculations.
         if (!bassInfo || typeof bassInfo.pc !== 'number' || !scalePCByLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-
-        // Compute the semitone alteration offset as it existed in the SOURCE
-        const alterationOffset = computeAlterationOffsetFromSource(parsed.acc, parsed.degree, bassInfo);
-        // Determine the target letter in the TRANSPOSED key by stepping from spelled new bass
-        const newBassPc = pcNewBass(bassInfo);
+        const newBassPc    = pcNewBass(bassInfo); // for sounding only
         const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
         if (!targetLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
 
-        // If we couldn't compute alterationOffset, fall back to previous behavior (interpret parsed.acc as direction)
-        if (alterationOffset === null) {
-          const finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
-          if (finalAccSym === null) {
-            return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-          }
-          return parsed.accOnly
-            ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
-            : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
-        }
-
-        // Apply the same signed alterationOffset to the TARGET diatonic pitch
-        const targetDiatonicPc = scalePCByLetter[targetLetter];
-        const desiredPcTarget = (targetDiatonicPc + alterationOffset + 120) % 12;
-
-        const finalAccSym = accidentalForDesiredPc(targetLetter, desiredPcTarget, false);
+        const finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
         if (finalAccSym === null) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
@@ -946,35 +815,22 @@ vrvToolkit.setOptions(baseOptions);
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
 
-        // Compute alteration offset in SOURCE
-        const alterationOffset = computeAlterationOffsetFromSource(parsed.acc, parsed.degree, bassInfo);
         const newBassPc    = pcNewBass(bassInfo); // sound-only
         const targetLetter = targetLetterForDegree(newBassPc, parsed.degree, bassInfo.letter);
         if (!targetLetter) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
 
-        if (alterationOffset === null) {
-          // fallback: preserve original behavior, including preserving explicit 'n'
-          let finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
-          if (finalAccSym === null) {
-            return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
-          }
-          if (finalAccSym === '' && /n/i.test(parsed.acc)) finalAccSym = 'n';
-          return parsed.accOnly
-            ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
-            : String(parsed.degree) + (toHumdrumAcc(finalAccSym) || '') + trailingBar;
-        }
-
-        // apply alteration offset to target diatonic
-        const targetDiatonicPc = scalePCByLetter[targetLetter];
-        const desiredPcTarget = (targetDiatonicPc + alterationOffset + 120) % 12;
-        let finalAccSym = accidentalForDesiredPc(targetLetter, desiredPcTarget, /n/i.test(parsed.acc));
+        let finalAccSym = accidentalForDirection(targetLetter, parsed.acc);
         if (finalAccSym === null) {
           return (parsed.accOnly ? toHumdrumAcc(parsed.acc) : String(parsed.degree) + toHumdrumAcc(parsed.acc)) + trailingBar;
         }
-        // preserve explicit natural token from actual spine even if computed '':
-        if (finalAccSym === '' && /n/i.test(parsed.acc)) finalAccSym = 'n';
+
+        // --- IMPORTANT: preserve explicit natural from Actual (3rd spine) ---
+        // If source had 'n' but the computed symbol is empty (''), still print 'n'.
+        if (finalAccSym === '' && /n/i.test(parsed.acc)) {
+          finalAccSym = 'n';
+        }
 
         return parsed.accOnly
           ? (toHumdrumAcc(finalAccSym) || '') + trailingBar
@@ -1125,36 +981,12 @@ vrvToolkit.setOptions(baseOptions);
 
       const semText = String(currentSemitones || 0);
       const actualAccLine = '##Actual Accidentals=' + (conventionsMode === 'modern' ? 'TRUE' : 'FALSE');
-
-      // --- NEW: compute a clear "target key" string to show in the hum panel ---
-      let targetKeyStr = '';
-      if (originalKeyIndex !== null) {
-        const displayIdx = (originalKeyIndex + currentSemitones + 120) % 12;
-        const tonicRaw = displayTonicOverride ? displayTonicOverride : indexToTonic(displayIdx, originalAccidentalPref);
-        const tonic = tonicDisplayWithGlyphs(tonicRaw);
-        const modeText = originalIsMajor ? ' major' : ' minor';
-        if (octaveShift !== 0) {
-          const octaveText = octaveShift > 0 ? " 8va↑ (" + String(octaveShift) + ")" : " 8va↓ (" + String(octaveShift) + ")";
-          targetKeyStr = tonic + modeText + octaveText;
-        } else {
-          targetKeyStr = tonic + modeText;
-        }
-      } else {
-        if (currentSemitones === 0 && octaveShift === 0) {
-          targetKeyStr = "original";
-        } else {
-          const totalSem = currentSemitones + (octaveShift * 12);
-          targetKeyStr = "transposed " + String(totalSem) + " st";
-        }
-      }
-
       const panelContent = [
         '##original humdrum file##',
         humData || '(empty)',
         '##currently displayed humdrum##',
         '##transpose ' + semText + ' semitones',
         actualAccLine,
-        '##target key=' + targetKeyStr,
         preparedHum || '(empty)'
       ].join('\n\n');
       if (humPanelEl) humPanelEl.textContent = panelContent;
@@ -1666,4 +1498,12 @@ async function pickRandomTuneAndTranspose() {
   </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
 
