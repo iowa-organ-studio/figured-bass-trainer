@@ -1,643 +1,1635 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Verovio — random key by signature count</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Verovio — figure-aware transposer (Historic/Modern + Courtesy)</title>
+<script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js"></script>
+<script src="https://www.verovio.org/javascript/latest/verovio-toolkit-hum.js"></script>
+<style>
+:root{
+  --bg:#f7f7f9;
+  --card:#fff;
+  --border:#e6e6ea;
+  --ink:#111;
+  --muted:#666;
+  --gold:#FFCD00;
+  --gold-ink:#2b2000;
+  --butter:#FFEFAD;
+  --grey:#e4e4e7;
+  --accent-green:#1f7a4b;
+}
+html,body{height:100%}
+body{
+  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  margin:12px;background:var(--bg);color:var(--ink)
+}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
-  <!-- Verovio CDN (replace with local copies if you prefer) -->
-  <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js"></script>
-  <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-hum.js"></script>
+/* ======= CONSTRAIN TOP ROW WIDTH (no full-page stretch) ======= */
+.controls-row{
+  display:grid;
+  grid-template-columns: auto auto max-content;  
+  gap:8px;
+  align-items:start;
+  max-width:980px;
+  margin:0;
+  justify-content:start;
+}
+@media (max-width:1000px){
+  .controls-row{
+    grid-template-columns:1fr;
+    max-width:100%;
+    margin:0
+  }
+}
 
-  <style>
-    :root{
-      --bg:#f7f7f9; --card:#fff; --border:#e6e6ea; --ink:#111; --muted:#666;
-      --gold:#FFCD00; --gold-ink:#2b2000; --butter:#FFEFAD; --grey:#e4e4e7;
-    }
-    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:12px;background:var(--bg);color:var(--ink)}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
-    header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.small{font-size:.9rem;color:var(--muted)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.spacer{flex:1}
 
-    #viewer{min-height:180px;padding:10px}
-    #svg{display:block;width:100%}
-    #humPanel{white-space:pre-wrap;font-family:monospace;background:#0e1620;color:#e6eef8;padding:10px;border-radius:8px;margin-top:10px;max-height:260px;overflow:auto}
-    .small{font-size:.9rem;color:var(--muted)}
-    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .chip-row{display:flex;gap:8px;flex-wrap:wrap}
-    .spacer{flex:1}
+/* ======= Title pills (single combined badge allowed) ======= */
+.title-badges{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.title-pill{
+  padding:6px 10px;
+  border-radius:10px;
+  background:#fff;
+  border:1px solid var(--border);
+  font-size:.92rem;
+  font-weight:600;
+  white-space:nowrap;
+}
+#keyPill{ display:inline-block; } /* show secondary pill */
+.title-pill small{ color:var(--muted); font-weight:500; margin-left:6px}
 
-    /* Filter chips */
-    .btn{padding:6px 10px;border-radius:999px;border:1px solid var(--grey);background:var(--grey);color:#222;cursor:pointer}
-    .btn.selected{background:var(--butter);border-color:var(--gold)}
+/* ======= Key range — much smaller buttons & correct glyphs ======= */
+.key-card{
+  font-size:.78rem;
+  padding:8px
+}
+.key-card h3{
+  margin:0 0 6px 0;
+  font-weight:700;
+  font-size:.9rem;
+}
+.key-grid{
+  display:grid;
+  grid-template-columns:repeat(4, auto);
+  gap:4px 6px;
+}
+.key-btn{
+  background:var(--grey);
+  border:1px solid var(--border);
+  color:#222;
+  padding:2px 6px;
+  border-radius:10px;
+  font-weight:400;
+  cursor:pointer;
+  min-width:36px;
+  box-shadow:0 1px 0 rgba(0,0,0,0.05) inset;
+  font-size:.72rem;
+  line-height:1.0;
+}
+.key-btn.selected{
+  background:var(--butter);
+  border-color:var(--gold);
+  color:var(--gold-ink);
+}
+.select-actions{display:flex;gap:6px;margin-top:6px}
+.select-actions .btn{
+  padding:4px 8px;
+  border-radius:8px;
+  background:#fff;
+  border:1px solid var(--border);
+  cursor:pointer;
+  font-size:.78rem;
+}
 
-    /* New Bass Line button (prominent) */
-    .new-bass-btn{
-      padding:8px 14px;
-      border-radius:999px;
-      border:1px solid #e6b800;
-      background:var(--gold);
-      color:var(--gold-ink);
-      font-weight:600;
-      box-shadow:0 1px 0 rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.35);
-      cursor:pointer;
-    }
-    .new-bass-btn:hover{ filter:brightness(0.97); }
-    .new-bass-btn:active{ transform:translateY(1px); }
+/* ======= Scale/Spacing — tight controls, small slider width ======= */
+.mid-card{
+  font-size:.88rem;
+  padding:8px
+}
+.control-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.small-pill{
+  background:#fff;
+  border:1px solid var(--border);
+  padding:4px 7px;
+  border-radius:8px;
+  font-weight:600;
+  font-size:.82rem;
+}
+.btn{padding:4px 8px;border-radius:999px;border:1px solid var(--grey);background:var(--grey);color:#222;cursor:pointer;font-size:.82rem}
+.btn.selected{background:var(--butter);border-color:var(--gold)}
+.slider{
+  width:220px;
+  height:8px;
+  background:linear-gradient(90deg,#f0c84e,#d9d9d9);
+  border-radius:8px;
+  position:relative;
+}
+.slider input[type=range]{
+  width:220px;
+  margin:0;
+  -webkit-appearance:none;
+  background:transparent;
+  position:relative;
+  top:-3px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:#fff;
+  border:2px solid #ccc;
+  box-shadow:0 1px 2px rgba(0,0,0,0.2);
+  cursor:pointer;
+}
 
-    /* Pills */
-    .pill-row { display:flex; gap:8px; align-items:center; margin-left:4px; }
-    .pill {
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 12px;
-      border-radius:999px;
-      background: #fff;
-      border:1px solid var(--border);
-      box-shadow: 0 1px 0 rgba(0,0,0,0.04);
-      font-size:0.95rem;
-      color:var(--ink);
-      white-space:nowrap;
-    }
-    .pill .muted { color:var(--muted); font-size:.85rem; margin-left:6px; }
-    .pill.key { background:#fff; border-color:var(--border); color:var(--ink); font-weight:600; }
+/* ======= Right (Transpose/Octave) ======= */
+.right-card{
+  font-size:.88rem;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:8px
+}
+.transpose-block{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+}
+.tp-btn{
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid #f0d59a;
+  background:#fff;
+  cursor:pointer;
+  font-size:.86rem;
+}
+#tpToggle{
+  padding:6px 12px;
+  border-radius:999px;
+  background:var(--accent-green);
+  color:#fff;
+  border:1px solid rgba(0,0,0,0.05);
+  font-weight:700;
+  box-shadow:0 2px 0 rgba(0,0,0,0.08);
+  margin-left:2px;
+  white-space:nowrap;
+}
 
-    /* Key-range chips */
-    .key-chip{ padding:6px 10px; border-radius:999px; border:1px solid #e6b800; background:var(--gold); color:var(--gold-ink); cursor:pointer; }
-    .key-chip.off{ background:var(--grey); border-color:var(--grey); color:#222; }
-    .key-range-commands .cmd{ padding:6px 10px; border-radius:999px; border:1px solid #e6b800; background:var(--butter); color:#222; cursor:pointer; }
-  </style>
+/* ======= Filters bar ======= */
+.filters-card{ margin-top:10px; }
+.filters-line{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.filters-line .group{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.radio-inline{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.radio-inline label{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+}
+
+/* Viewer */
+#viewer{ margin-top:10px; }
+
+.new-bass-btn{
+  padding:8px 12px;border-radius:999px;border:1px solid #e6b800;background:var(--gold);color:var(--gold-ink);font-weight:600;cursor:pointer
+}
+
+/* humdrum panel monospace */
+#humPanel { font-size:0.9rem; line-height:1.25; }
+</style>
 </head>
 <body>
-
 <div class="card">
-  <header>
+  <header style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <button id="randomFiltered" class="new-bass-btn" type="button">New Bass Line</button>
-
-    <div class="pill-row" id="titlePills" aria-hidden="false" style="margin-left:6px">
-      <div class="pill" id="titlePill">No title <span class="muted" id="titleDiff"></span></div>
-      <div class="pill key" id="keyPill"><span id="keyPillValue">original</span></div>
+    <!-- Single combined title badge -->
+    <div class="title-badges" id="titlePills" aria-hidden="false" style="margin-left:6px">
+      <div class="title-pill" id="titlePill">No title <small id="titleSub"></small></div>
+      <div class="title-pill" id="keyPill"><span id="keyPillValue">original</span></div>
     </div>
-
     <div class="spacer"></div>
   </header>
 
-  <!-- Filters -->
-  <div class="card" style="margin-top:10px">
-    <div class="row">
-      <span class="small">Filters:</span>
-
-      <div class="chip-row" id="dirRow">
-        <button class="btn" data-filter="dir" data-value="ascending">Ascending</button>
-        <button class="btn" data-filter="dir" data-value="descending">Descending</button>
+  <!-- Top controls row -->
+  <div class="controls-row" style="margin-top:8px">
+    <!-- Key range -->
+    <div class="card key-card">
+      <h3>Key range</h3>
+      <div class="key-grid" id="keyGrid">
+        <button class="key-btn" data-count="0">0♯/0♭</button>
+        <button class="key-btn" data-count="1">1♯/1♭</button>
+        <button class="key-btn" data-count="2">2♯/2♭</button>
+        <button class="key-btn" data-count="3">3♯/3♭</button>
+        <button class="key-btn" data-count="4">4♯/4♭</button>
+        <button class="key-btn" data-count="5">5♯/5♭</button>
+        <button class="key-btn" data-count="6">6♯/6♭</button>
+        <button class="key-btn" data-count="7">7♯/7♭</button>
       </div>
-
-      <div class="chip-row" id="modeRow">
-        <button class="btn" data-filter="mode" data-value="major">Major</button>
-        <button class="btn" data-filter="mode" data-value="minor">Minor</button>
+      <div class="select-actions">
+        <button id="selectAllKeys" class="btn">select all</button>
+        <button id="selectNoneKeys" class="btn">select none</button>
       </div>
-
-      <div class="chip-row" id="diffRow"></div>
-
-      <div class="spacer"></div>
-      <button id="clearFilters">Clear filters</button>
     </div>
 
-    <div class="small" style="margin-top:6px">
-      Matching files: <span id="matchCount">0</span> / <span id="totalCount">0</span>
+    <!-- Scale / Spacing -->
+    <div class="card mid-card">
+      <div style="font-weight:700; margin-bottom:4px">Scale</div>
+      <div class="control-row">
+        <button class="small-pill" id="scaleReset">reset</button>
+        <button class="btn" id="scaleMinus">−</button>
+        <button class="btn" id="scalePlus">+</button>
+        <div class="small-pill" id="scaleValue">50</div>
+      </div>
+      <div class="slider" aria-hidden="true" style="margin-top:4px">
+        <input id="scaleSlider" type="range" min="10" max="120" value="50">
+      </div>
+
+      <div style="height:6px"></div>
+
+      <div style="font-weight:700; margin-bottom:4px">Spacing</div>
+      <div class="control-row">
+        <button class="small-pill" id="spacingReset">reset</button>
+        <button class="btn" id="spacingMinus">−</button>
+        <button class="btn" id="spacingPlus">+</button>
+        <div class="small-pill" id="spacingValue">0.32</div>
+      </div>
+      <div class="slider" aria-hidden="true" style="margin-top:4px">
+        <input id="spacingSlider" type="range" min="10" max="80" value="32">
+      </div>
+    </div>
+
+    <!-- Transpose / Octave -->
+    <div class="card right-card">
+      <div style="font-weight:700">Transpose</div>
+      <div class="transpose-block">
+        <button class="tp-btn" id="tpMinus">−</button>
+        <button class="tp-btn" id="tpPlus">+</button>
+        <button class="tp-btn" id="tpToggle">♯/♭</button>
+      </div>
+      <div style="height:6px"></div>
+      <div style="font-weight:700">Octave</div>
+      <div class="transpose-block">
+        <button class="tp-btn" id="octMinus">−</button>
+        <button class="tp-btn" id="octPlus">+</button>
+      </div>
     </div>
   </div>
 
-  <!-- Key range -->
-  <div class="card" style="margin-top:10px">
-    <div class="row" style="align-items:flex-start">
-      <div style="min-width:80px"><strong class="small">Key range</strong></div>
-      <div class="chip-row" id="keyRangeRow" style="gap:8px;max-width:520px"></div>
-      <div class="key-range-commands" style="display:flex;gap:8px;margin-left:auto">
-        <button class="cmd" id="keySelectAll">select all</button>
-        <button class="cmd" id="keySelectNone">select none</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="viewer" class="card" style="margin-top:10px">
+  <!-- Viewer -->
+  <div id="viewer" class="card" style="margin-top:8px">
     <div id="svg">Waiting for Verovio…</div>
-    <div style="margin-top:8px" class="small">created for the University of Iowa Organ Studio</div>
+    <div id="modeTagline" class="small" style="margin-top:8px">
+      Created for the University of Iowa Organ Studio
+      <span id="historicalStatus" style="margin-left:12px;color:var(--muted)">Historical=TRUE</span>
+    </div>
   </div>
 
-  <label class="small" style="margin-top:8px;display:block">Displayed humdrum / .krn (prepared shown below):</label>
-  <div id="humPanel">(no file loaded)</div>
+  <!-- Filters -->
+  <div class="card filters-card">
+    <div class="filters-line">
+      <div class="group">
+        <div class="small" style="min-width:46px">Dir:</div>
+        <div class="chip-row" id="dirRow">
+          <button class="btn" data-filter="dir" data-value="ascending">Ascending</button>
+          <button class="btn" data-filter="dir" data-value="descending">Descending</button>
+        </div>
+      </div>
+      <div class="group">
+        <div class="small" style="min-width:52px">Mode:</div>
+        <div class="chip-row" id="modeRow">
+          <button class="btn" data-filter="mode" data-value="major">Major</button>
+          <button class="btn" data-filter="mode" data-value="minor">Minor</button>
+        </div>
+      </div>
+      <div class="group">
+        <div class="small" style="min-width:40px">Lvl:</div>
+        <div class="chip-row" id="diffRow">
+          <button class="btn" data-filter="diff" data-value="1">1</button>
+          <button class="btn" data-filter="diff" data-value="2">2</button>
+          <button class="btn" data-filter="diff" data-value="3">3</button>
+          <button class="btn" data-filter="diff" data-value="4">4</button>
+          <button class="btn" data-filter="diff" data-value="5">5</button>
+          <button class="btn" data-filter="diff" data-value="6">6</button>
+          <button class="btn" data-filter="diff" data-value="7">7</button>
+        </div>
+      </div>
+      <div class="group">
+        <div class="small" style="min-width:88px">Accidentals:</div>
+        <div class="radio-inline">
+          <label><input type="radio" name="accMode" value="historic" checked> Historic</label>
+          <label><input type="radio" name="accMode" value="modern"> Modern</label>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="group">
+        <div class="small">Matching: <span id="matchCount">0</span> / <span id="totalCount">0</span></div>
+        <button id="clearFilters" class="btn">Clear filters</button>
+      </div>
+    </div>
+  </div>
 
-  <div class="small" id="status" style="margin-top:8px">Status: initializing…</div>
+  <!-- Humdrum panel -->
+  <label class="small" style="margin-top:8px;display:block">Displayed humdrum / .krn (absolute original shown below):</label>
+  <div id="humPanel" class="card" style="margin-top:8px;white-space:pre-wrap;font-family:monospace">(no file loaded)</div>
+
+  <!-- Trace -->
+  <div class="card" style="margin-top:8px">
+    <div class="row">
+      <div class="small">Trace:</div>
+      <label><input type="checkbox" id="traceToggle"> Trace ON</label>
+      <button id="clearTrace" class="btn">Clear trace</button>
+      <button id="downloadTrace" class="btn">Download trace</button>
+      <div class="spacer"></div>
+      <div class="small" id="status">Status: initializing…</div>
+    </div>
+    <label class="small" style="margin-top:6px;display:block">Trace output (copy & paste here):</label>
+    <div id="tracePanel" class="card" style="margin-top:6px;white-space:pre-wrap;font-family:monospace">(trace disabled)</div>
+  </div>
 </div>
 
 <script>
 (async function () {
-  // ---------- DOM refs ----------
-  const svgHost     = document.getElementById('svg');
-  const humPanel    = document.getElementById('humPanel');
-  const status      = document.getElementById('status');
-  const dirRow      = document.getElementById('dirRow');
-  const modeRow     = document.getElementById('modeRow');
-  const diffRow     = document.getElementById('diffRow');
-  const matchCount  = document.getElementById('matchCount');
-  const totalCount  = document.getElementById('totalCount');
-  const randomBtn   = document.getElementById('randomFiltered');
-  const clearBtn    = document.getElementById('clearFilters');
+// -------------------- CONSTANTS --------------------
+const BASE_PITCH = { 'C':0,'D':2,'E':4,'F':5,'G':7,'A':9,'B':11 };
+const ACC_OFF = { '--': -2, '-': -1, 'n': 0, '#': +1, '##': +2 };
+const ACC_GLYPHS = ['--','-','n','#','##'];
+const MAJOR_BY_COUNT = {0:['C'],1:['G','F'],2:['D','Bb'],3:['A','Eb'],4:['E','Ab'],5:['B','Db'],6:['F#','Gb'],7:['C#','Cb']};
+const MINOR_BY_COUNT = {0:['a'],1:['e','d'],2:['b','g'],3:['f#','c'],4:['c#','f'],5:['g#','bb'],6:['d#','eb'],7:['a#','ab']};
+const KEY_TOKEN_RE = /^\*([A-Ga-g])([#\u266f-]{0,2})\s*:/
 
-  const keyRangeRow = document.getElementById('keyRangeRow');
-  const keySelectAllBtn = document.getElementById('keySelectAll');
-  const keySelectNoneBtn = document.getElementById('keySelectNone');
+// -------------------- DOM refs --------------------
+const svgHost = document.getElementById('svg');
+const humPanel = document.getElementById('humPanel');
+const status = document.getElementById('status');
 
-  // Pill elements
-  const titlePill = document.getElementById('titlePill');
-  const titleDiff = document.getElementById('titleDiff');
-  const keyPillValue = document.getElementById('keyPillValue');
+const dirRow = document.getElementById('dirRow');
+const modeRow = document.getElementById('modeRow');
+const diffRow = document.getElementById('diffRow');
+const matchCount = document.getElementById('matchCount');
+const totalCount = document.getElementById('totalCount');
 
-  function setStatus(txt, isErr){
-    status.textContent = 'Status: ' + txt;
-    status.style.color = isErr ? 'crimson' : '';
+const randomBtn = document.getElementById('randomFiltered');
+const clearBtn = document.getElementById('clearFilters');
+
+const titlePill = document.getElementById('titlePill');
+const keyPillValue= document.getElementById('keyPillValue');
+
+const traceToggle = document.getElementById('traceToggle');
+const tracePanel = document.getElementById('tracePanel');
+const clearTraceBtn = document.getElementById('clearTrace');
+const downloadTraceBtn = document.getElementById('downloadTrace');
+
+const modeTagline = document.getElementById('modeTagline');
+const historicalStatus = document.getElementById('historicalStatus');
+
+// Accidentals (Historic/Modern)
+const accRadios = Array.from(document.querySelectorAll('input[name="accMode"]'));
+let ACC_MODE = 'historic'; // 'historic' | 'modern'
+
+// Key range state/UI
+const keyButtons = Array.from(document.querySelectorAll('.key-btn'));
+const selectAllKeysBtn = document.getElementById('selectAllKeys');
+const selectNoneKeysBtn = document.getElementById('selectNoneKeys');
+let enabledCounts = new Set([0,1,2,3,4,5,6,7]);
+
+// Scale / Spacing (UI-only)
+const scaleSlider = document.getElementById('scaleSlider');
+const scaleValue = document.getElementById('scaleValue');
+const spacingSlider = document.getElementById('spacingSlider');
+const spacingValue = document.getElementById('spacingValue');
+const scaleReset = document.getElementById('scaleReset');
+const spacingReset= document.getElementById('spacingReset');
+const scaleMinus = document.getElementById('scaleMinus');
+const scalePlus = document.getElementById('scalePlus');
+const spacingMinus= document.getElementById('spacingMinus');
+const spacingPlus = document.getElementById('spacingPlus');
+
+// Transpose / Octave
+const tpMinus = document.getElementById('tpMinus');
+const tpPlus = document.getElementById('tpPlus');
+const tpToggle= document.getElementById('tpToggle');
+const octMinus= document.getElementById('octMinus');
+const octPlus = document.getElementById('octPlus');
+
+// -------------------- Utils --------------------
+function setStatus(txt, isErr){
+  status.textContent = 'Status: ' + txt;
+  status.style.color = isErr ? 'crimson' : '';
+}
+function escapeHtml(str){
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function nextLetter(letter){
+  return 'CDEFGAB'[('CDEFGAB'.indexOf(letter.toUpperCase()) + 1) % 7];
+}
+function letterStepsUp(fromLetter, steps){ // steps >= 0
+  const order = 'CDEFGAB';
+  const i = order.indexOf(fromLetter.toUpperCase());
+  return order[(i + (steps % 7) + 7) % 7];
+}
+
+// Normalize tonic to Humdrum glyphs ('-', '--', '#', '##', 'n')
+function normalizeTonicForHumdrum(s) {
+  if (!s) return s;
+  const raw = String(s).trim();
+  const m = raw.match(/^([A-Ga-g])([#\u266f]|##|b|bb|\u266d|--|-)?$/);
+  if (!m) return raw;
+  const letter = m[1];
+  let acc = m[2] || '';
+  acc = acc
+    .replace(/\u266f/g, '#')
+    .replace(/\u266d/g, '-')
+    .replace(/bb/g, '--')
+    .replace(/b/g, '-');
+  return letter + acc;
+}
+
+// Parse tonic string "A", "Ab", "C#", returns {letter, acc, mode}
+function parseTonicString(s){
+  if (!s) return null;
+  const m = String(s).trim().match(/^([A-Ga-g])([#\u266f-]{0,2})$/);
+  if (!m) return null;
+  let letter = m[1].toUpperCase();
+  let acc = (m[2] || '') || 'n';
+  acc = acc.replace(/\u266f/g, '#');
+  if (acc === '') acc = 'n';
+  return { letter, acc, mode: (m[1] === m[1].toLowerCase() ? 'minor' : 'major') };
+}
+
+function spelledToSemitone(letter, glyph){
+  const base = BASE_PITCH[letter.toUpperCase()];
+  const off = (ACC_OFF[glyph] !== undefined) ? ACC_OFF[glyph] : 0;
+  return ((base + off) % 12 + 12) % 12;
+}
+function semitoneToAccidentalForLetter(letter, targetSemitone){
+  for (const g of ACC_GLYPHS){
+    const v = ((BASE_PITCH[letter.toUpperCase()] + ACC_OFF[g])%12+12)%12;
+    if (v === ((targetSemitone%12)+12)%12) return g;
   }
+  return null;
+}
 
-  // ---------- Verovio init ----------
-  function waitForVerovio(timeout=10000){
-    return new Promise((resolve,reject) => {
-      const start = performance.now();
-      (function poll(){
-        if (window.verovio && window.verovio.module) return resolve();
-        if (performance.now() - start > timeout) return reject(new Error('verovio global/module not found'));
-        setTimeout(poll,40);
-      })();
-    });
+// Build key signature scale (letters fixed, accidentals from signature)
+function buildScale(tonicStr, mode){
+  const parsed = parseTonicString(tonicStr);
+  if (!parsed) throw new Error('Bad tonic: ' + tonicStr);
+  const pattern = (mode === 'minor') ? [2,1,2,2,1,2,2] : [2,2,1,2,2,2,1];
+  const tonicSem = spelledToSemitone(parsed.letter, parsed.acc);
+  let letters = [];
+  let L = parsed.letter;
+  for (let i=0;i<7;i++){
+    letters.push(L);
+    L = nextLetter(L);
   }
-
-  try {
-    setStatus('waiting for verovio module...');
-    await waitForVerovio();
-  } catch (err) {
-    setStatus('verovio module not found — check script paths', true);
-    svgHost.textContent = 'Verovio module not found';
-    return;
+  const sems = [tonicSem];
+  for (let i=0;i<6;i++) sems.push((sems[sems.length-1] + pattern[i])%12);
+  const scale = [];
+  for (let i=0;i<7;i++){
+    const letter = letters[i];
+    const sem = (sems[i]+12)%12;
+    const acc = semitoneToAccidentalForLetter(letter, sem);
+    if (!acc) throw new Error(`Cannot spell degree ${i+1} (${letter}) in key ${tonicStr}`);
+    scale.push({ letter, acc, semitone: sem });
   }
+  return scale;
+}
 
-  let vrv = null;
-  async function createToolkit(){
-    return new Promise((resolve,reject) => {
-      try {
-        if (typeof verovio.toolkit === 'function') {
-          vrv = new verovio.toolkit();
-          return resolve(vrv);
+// --------- NEW: compute spelled interval from original key to target key ----------
+const PERFECT_CLASSES = new Set([1,4,5]);
+const MAJOR_BASE = {2:2,3:4,6:9,7:11}; // semitones for Major intervals
+const PERFECT_BASE = {1:0,4:5,5:7};
+
+function diatonicDistanceNum(fromLetter, toLetter){
+  const order = 'CDEFGAB';
+  const a = order.indexOf(fromLetter.toUpperCase());
+  const b = order.indexOf(toLetter.toUpperCase());
+  const steps = (b - a + 7) % 7; // 0..6
+  return steps + 1; // 1..7
+}
+
+function computeKeyToKeyInterval(origTonicStr, targetTonicStr){
+  const o = parseTonicString(normalizeTonicForHumdrum(origTonicStr));
+  const t = parseTonicString(normalizeTonicForHumdrum(targetTonicStr));
+  if (!o || !t) throw new Error('Bad tonic(s) for interval');
+
+  const num = diatonicDistanceNum(o.letter, t.letter); // 1..7 upward within octave
+  const oSem = spelledToSemitone(o.letter, o.acc);
+  const tSem = spelledToSemitone(t.letter, t.acc);
+  let semDelta = ((tSem - oSem) % 12 + 12) % 12; // 0..11 (upward class)
+
+  let base = PERFECT_CLASSES.has(num) ? PERFECT_BASE[num] : MAJOR_BASE[num]; // P or M baseline
+  // Convert to -2..+2 difference
+  let diff = semDelta - base;
+  if (diff > 6) diff -= 12; // normalize
+
+  let quality = 'P';
+  if (PERFECT_CLASSES.has(num)){
+    if (diff === 0) quality = 'P';
+    else if (diff === +1) quality = 'A';
+    else if (diff === -1) quality = 'd';
+    else if (diff === +2) quality = 'AA';
+    else if (diff === -2) quality = 'dd';
+    else throw new Error(`Unsupported quality for perfect class: diff=${diff}`);
+  } else {
+    if (diff === 0) quality = 'M';
+    else if (diff === -1) quality = 'm';
+    else if (diff === +1) quality = 'A';
+    else if (diff === -2) quality = 'd';
+    else if (diff === +2) quality = 'AA';
+    else if (diff === -3) quality = 'dd';
+    else throw new Error(`Unsupported quality for major/minor class: diff=${diff}`);
+  }
+  const totalSemitones = base + diff;
+  return { number: num, quality, semitones: ((totalSemitones % 12) + 12) % 12 };
+}
+
+// --------- NEW: transpose ANY spelled pitch by a spelled interval (letter-preserving) ----------
+function transposeSpelledPitchByInterval(originalLetter, originalAcc, interval){
+  // Step 1: letter motion
+  const targetLetter = letterStepsUp(originalLetter, interval.number - 1);
+
+  // Step 2: target semitone = original semitone + interval.semitones
+  const origSem = spelledToSemitone(originalLetter, originalAcc);
+  const targSem = ((origSem + interval.semitones) % 12 + 12) % 12;
+
+  // Step 3: choose the accidental for the *fixed target letter* that matches targSem
+  const acc = semitoneToAccidentalForLetter(targetLetter, targSem);
+  if (!acc) return null; // cannot express with --,-,n,#,##
+
+  return { letter: targetLetter, acc, semitone: targSem };
+}
+
+// ------------- Diatonic spelling for a numeral above (works for chromatic bass) -------------
+function diatonicSpelling(tonicStr, mode, bassSpelled, numeral){
+  // Compute the diatonic *letter* N above bass
+  let letter = bassSpelled.letter;
+  for (let i=1;i<=numeral-1;i++) letter = nextLetter(letter);
+
+  // Key signature defines the accidental for that letter (baseline diatonic)
+  const scale = buildScale(tonicStr, mode);
+  const entry = scale.find(s => s.letter === letter);
+  if (entry) return { letter: entry.letter, acc: entry.acc, semitone: entry.semitone };
+
+  // Fallback (rare): derive semitone by key pattern
+  const pattern = (mode === 'minor') ? [2,1,2,2,1,2,2] : [2,2,1,2,2,2,1];
+  const bassSem = spelledToSemitone(bassSpelled.letter, bassSpelled.acc);
+  let sum = 0;
+  for (let i=0;i<numeral-1;i++) sum += pattern[i%7];
+  const expSem = ((bassSem + sum)%12+12)%12;
+  const g = semitoneToAccidentalForLetter(letter, expSem);
+  if (g) return { letter, acc: g, semitone: spelledToSemitone(letter, g) };
+  throw new Error(`Unable to diatonically spell numeral ${numeral} above ${bassSpelled.letter}${bassSpelled.acc} in ${tonicStr}`);
+}
+
+// Verovio toolkit
+let vrv;
+const baseOptions = { scale:50, pageWidth:900, adjustPageHeight:true, spacingLinear:0.32, spacingNonLinear:0.46 };
+
+// -------------------- Verovio init --------------------
+async function waitForVerovioGlobal(timeout = 10000) {
+  return new Promise((resolve, reject) => {
+    const start = performance.now();
+    (function poll() {
+      if (window.verovio && (window.verovio.toolkit || window.verovio.module)) return resolve();
+      if (performance.now() - start > timeout) return reject(new Error('verovio global not available'));
+      setTimeout(poll, 40);
+    })();
+  });
+}
+async function createToolkitRobust() {
+  if (typeof window.verovio === 'undefined') throw new Error('verovio not loaded');
+  if (typeof window.verovio.toolkit === 'function') {
+    try { return new verovio.toolkit(); } catch(e){}
+  }
+  const mod = window.verovio && window.verovio.module;
+  if (mod && typeof mod.onRuntimeInitialized === 'function') {
+    return new Promise((resolve, reject) => {
+      const old = mod.onRuntimeInitialized;
+      mod.onRuntimeInitialized = function() {
+        try {
+          const tk = new verovio.toolkit();
+          resolve(tk);
+        } catch (err) {
+          reject(err);
         }
-      } catch(e){}
-      const mod = window.verovio && window.verovio.module;
-      if (mod && typeof mod.onRuntimeInitialized === 'function') {
-        mod.onRuntimeInitialized = () => {
-          try { vrv = new verovio.toolkit(); resolve(vrv); } catch(err){ reject(err); }
-        };
-      } else {
-        setTimeout(() => {
-          try { vrv = new verovio.toolkit(); resolve(vrv); } catch(err){ reject(err); }
-        }, 500);
+        if (typeof old === 'function') try { old(); } catch(e){}
+      };
+      if (mod._initialized) {
+        try { const tk = new verovio.toolkit(); resolve(tk); } catch (err) { reject(err); }
       }
     });
   }
+  await new Promise(r => setTimeout(r, 300));
+  if (typeof window.verovio.toolkit === 'function') return new verovio.toolkit();
+  throw new Error('Unable to initialize verovio toolkit');
+}
 
-  try {
-    setStatus('initializing toolkit...');
-    await createToolkit();
-  } catch (err) {
-    console.error(err);
-    setStatus('Error creating toolkit: ' + (err.message||err), true);
-    svgHost.textContent = 'Toolkit creation failed; see console';
-    return;
-  }
+try {
+  setStatus('waiting for verovio global...');
+  await waitForVerovioGlobal();
+} catch (e) {
+  setStatus('Verovio not found: ' + e.message, true);
+  svgHost.textContent = 'Verovio not available';
+}
+try {
+  setStatus('creating verovio toolkit...');
+  vrv = await createToolkitRobust();
+  if (vrv) vrv.setOptions(baseOptions);
+} catch (e) {
+  setStatus('Failed to create toolkit: ' + (e.message || e), true);
+  svgHost.textContent = 'Toolkit init failed — see console';
+}
+setStatus('toolkit ready');
 
-  const baseOptions = { scale:50, pageWidth:900, adjustPageHeight:true, spacingLinear:0.32, spacingNonLinear:0.46 };
-  vrv.setOptions(baseOptions);
-  setStatus('toolkit ready');
+// -------------------- Trace --------------------
+let TRACE_ON = false;
+let traceBuf = [];
+function renderTrace(){
+  tracePanel.textContent = TRACE_ON ? traceBuf.join('\n') : '(trace disabled)';
+}
+function traceClear(){ traceBuf = []; renderTrace(); }
+function traceLog(msg){
+  if (!TRACE_ON) return;
+  traceBuf.push(`[${new Date().toISOString()}] ${msg}`);
+  if (traceBuf.length > 3000) traceBuf.shift();
+  renderTrace();
+}
+function traceDownload(){
+  const blob = new Blob([traceBuf.join('\n')], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'krn-transpose-trace.txt';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+traceToggle.addEventListener('change', (e)=>{
+  TRACE_ON = e.target.checked;
+  renderTrace();
+});
+clearTraceBtn.addEventListener('click', traceClear);
+downloadTraceBtn.addEventListener('click', traceDownload);
 
-  // ---------- Helpers ----------
-  function hasKeyDesignationKRn(krn){ return /^\*([A-Ga-g])([#b-]?)\s*:/m.test(krn); }
-  function hasKeySigKRn(krn){ return /^\*k\s*\[[^\]]*\]/m.test(krn); }
-
-  // Mode from *X: — uppercase = Major, lowercase = minor
-  function modeFromKern(krn){
-    const m = krn.match(/^\*([A-Ga-g])([#b-]?)\s*:/m);
-    if (!m) return null;
-    const isMajor = (m[1] === m[1].toUpperCase());
-    return isMajor ? 'major' : 'minor';
-  }
-
-  // STRICT metadata extractor (no generic !! fallback)
-  function metaFromHeader(krn){
-    const lines = krn.split(/\r?\n/).slice(0, 80);
-    let dir = null, diff = null, title = null, mode = null;
-
-    for (const ln of lines){
-      const s = ln.trim();
-      if (!s || !s.startsWith('!!')) continue;
-
-      const titleMatch = s.match(/^!!\s*(?:Title|T)\s+(.*)$/i);
-      if (titleMatch && titleMatch[1] && !title){
-        title = titleMatch[1].trim();
-        continue;
-      }
-
-      const numMatch = s.match(/^!!\s*Number\s+(\d+)\s*$/i);
-      if (numMatch && numMatch[1]){
-        diff = parseInt(numMatch[1], 10);
-        continue;
-      }
-
-      const dirLine = s.match(/^!!\s*Dir\b(.*)$/i);
-      if (dirLine){
-        const rest = dirLine[1];
-        if (/ascending/i.test(rest)) dir = 'ascending';
-        if (/descending/i.test(rest)) dir = 'descending';
-        if (/major/i.test(rest)) mode = 'major';
-        if (/minor/i.test(rest)) mode = 'minor';
-        continue;
-      }
+// -------------------- Courtesy / suppression / modern override --------------------
+function suppressThirdFourthSpinesAfterKey(krnText){
+  const lines = krnText.split(/\r?\n/);
+  let suppress = false;
+  return lines.map(line => {
+    if (!line.includes('\t')) {
+      if (!suppress && KEY_TOKEN_RE.test(line.trim())) suppress = true;
+      return line;
     }
-
-    if (!mode) mode = modeFromKern(krn);
-    return { dir, mode, diff, title };
-  }
-
-  function escapeHtml(str){
-    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-  function capitalize(s){
-    return String(s || '').replace(/^\w/, c => c.toUpperCase());
-  }
-
-  // ---------- GENERALIZED SUPPRESSION ----------
-  // Replace spines 3 & 4 with '.' starting AFTER the first key declaration *X:
-  // Keep '*-' intact. Dot EVERYTHING else (data, barlines, interpretations).
-  function suppressThirdFourthSpinesAfterKey(krnText){
-    const lines = krnText.split(/\r?\n/);
-    let suppress = false;
-
-    // Regex matches *X: where X is a letter A–G/a–g with optional accidentals (#, bb, b, n, -)
-    // Examples: *C: *a: *f#: *Eb: *c##:
-    const KEY_TOKEN_RE = /^\*[A-Ga-g](?:#{1,2}|b{1,2}|n|-)?\s*:\s*$/;
-
-    return lines.map(line => {
-      // Quick path for non-tab lines
-      if (!line.includes('\t')) {
-        // If any single-spine line contains a key token, start suppression from NEXT line
-        if (!suppress && KEY_TOKEN_RE.test(line.trim())) suppress = true;
+    const fields = line.split('\t');
+    if (!suppress) {
+      if (fields.some(f => KEY_TOKEN_RE.test((f||'').trim()))) {
+        suppress = true;
         return line;
       }
-
-      const fields = line.split('\t');
-
-      // If the line contains any key token in any spine, begin suppression from NEXT line
-      if (!suppress) {
-        const hasKeyHere = fields.some(f => KEY_TOKEN_RE.test(f.trim()));
-        if (hasKeyHere) {
-          suppress = true;
-          return line; // don't alter the key-declaration line itself
-        }
-        return line; // still before the key: no changes
-      }
-
-      // We are after the key: dot out spines 3 and 4 if present
-      for (let i = 2; i <= 3 && i < fields.length; i++){
-        const tok = fields[i].trim();
-        if (tok !== '*-') fields[i] = '.';
-      }
-      return fields.join('\t');
-    }).join('\n');
-  }
-
-  // ---------- Title pill [Dir Mode] [Title] {Number}
-  function updatePillsFromCatalogEntry(entry){
-    const dirWord  = entry?.dir ? capitalize(entry.dir) : '';
-    const modeWord = entry?.mode ? capitalize(entry.mode) : '';
-    const dirMode  = [dirWord, modeWord].filter(Boolean).join(' ');
-
-    // Only explicit Title (or fallback to filename), never generic '!! ...'
-    let titleText = entry?.title || '';
-    if (!titleText && entry?.path) {
-      const fname = entry.path.split('/').pop() || entry.path;
-      const parts = fname.split('.');
-      if (parts.length > 1) parts.pop();
-      titleText = parts.join('.') || fname;
+      return line;
     }
-
-    const leading = dirMode ? (dirMode + ' ') : '';
-    const mainText = leading + (titleText || 'No title');
-    const diffText = (entry && entry.diff != null) ? String(entry.diff) : '';
-
-    titlePill.innerHTML = escapeHtml(mainText) + (diffText ? ` <span class="muted">${escapeHtml(diffText)}</span>` : '');
-  }
-
-  // Key pill helpers
-  function formatKeyName(tonic, mode){
-    if (!tonic) return 'original';
-    const m = String(tonic).trim().match(/^([A-Ga-g])(.+)?$/);
-    if (!m) return tonic + ' ' + (mode === 'minor' ? 'minor' : 'major');
-    let letter = m[1];
-    let acc = m[2] || '';
-    acc = acc.replace(/bb/g, '♭♭').replace(/b/g, '♭').replace(/#/g, '♯');
-    const root = (mode === 'minor') ? letter.toLowerCase() : letter.toUpperCase();
-    return root + acc + ' ' + (mode === 'minor' ? 'minor' : 'major');
-  }
-  function updateKeyPill(tonic, mode){
-    keyPillValue.textContent = formatKeyName(tonic, mode);
-  }
-
-  function renderWithTonic(tonic, mode) {
-    const opt = { ...baseOptions };
-    if (tonic) opt.transpose = String(tonic);
-    vrv.setOptions(opt);
-    try {
-      const svg = vrv.renderData(currentKrn || '', {});
-      svgHost.innerHTML = svg;
-      humPanel.textContent = currentKrn || '(empty)';
-      setStatus(tonic ? `Rendered with tonic "${tonic}"` : 'Rendered original');
-      updateKeyPill(tonic || '', mode || (modeFromKern(currentKrn) || (currentEntry?.mode || 'major')));
-    } catch (e) {
-      console.error(e);
-      svgHost.textContent = 'Render error: ' + (e?.message || e);
-      setStatus('Render failed — see console', true);
+    for (let i = 2; i <= 3 && i < fields.length; i++){
+      const tok = (fields[i]||'').trim();
+      if (tok !== '*-') fields[i] = '.';
     }
-  }
+    return fields.join('\t');
+  }).join('\n');
+}
 
-  // ---------- Major/minor target sets per key-signature count ----------
-  const MAJOR_BY_COUNT = {
-    0: ['C'],
-    1: ['G','F'],
-    2: ['D','Bb'],
-    3: ['A','Eb'],
-    4: ['E','Ab'],
-    5: ['B','Db'],
-    6: ['F#','Gb'],
-    7: ['C#','Cb']
-  };
-  const MINOR_BY_COUNT = {
-    0: ['a'],
-    1: ['e','d'],
-    2: ['b','g'],
-    3: ['f#','c'],
-    4: ['c#','f'],
-    5: ['g#','bb'],
-    6: ['d#','eb'],
-    7: ['a#','ab']
-  };
-
-  // ---------- Catalog indexing (from tunes.json) ----------
-  let catalog = [];  // { path, text, dir, mode, diff, title }
-  let currentKrn = '';
-  let currentEntry = null;
-
-  async function fetchList(){
-    try {
-      const r = await fetch('tunes.json?_=' + Date.now(), { cache:'no-cache' });
-      if (!r.ok) return [];
-      const arr = await r.json();
-      const list = Array.isArray(arr) ? arr : (Array.isArray(arr.files) ? arr.files : []);
-      return (list || []).map(x => String(x).replace(/^\/+/, ''));
-    } catch(e){ return []; }
-  }
-
-  async function fetchText(path){
-    const p = path.startsWith('tunes/') ? path : 'tunes/' + path;
-    const r = await fetch(p + '?_=' + Date.now(), { cache:'no-cache' });
-    if (!r.ok) throw new Error('fetch failed: ' + p);
-    const t = await r.text();
-    return { path: p, text: t };
-  }
-
-  async function buildCatalog(paths, concurrency=4){
-    catalog = [];
-    let i = 0;
-    const results = [];
-    async function worker(){
-      while (i < paths.length){
-        const idx = i++;
-        const raw = paths[idx];
-        if (!/\.(krn|hum|txt)$/i.test(raw)) continue;
-        try {
-          const { path, text } = await fetchText(raw);
-          const meta = metaFromHeader(text);
-          results.push({ path, dir: meta.dir, mode: meta.mode, diff: meta.diff, title: meta.title, text });
-        } catch(e){
-          // skip on error
-        }
+function applyModernOverride(krnText){
+  const lines = krnText.split(/\r?\n/);
+  let afterKey = false;
+  return lines.map(line => {
+    if (!line.includes('\t')) {
+      if (!afterKey && KEY_TOKEN_RE.test(line.trim())) afterKey = true;
+      return line;
+    }
+    const fields = line.split('\t');
+    if (!afterKey) {
+      if (fields.some(f => KEY_TOKEN_RE.test((f||'').trim()))) {
+        afterKey = true;
+        return line;
+      }
+      return line;
+    }
+    if (fields.length >= 3) {
+      const s3 = (fields[2] ?? '').trim();
+      if (s3 && s3 !== '.' && !s3.startsWith('*') && !s3.startsWith('=') && s3 !== '*-') {
+        fields[1] = s3; // spine-3 → spine-2
       }
     }
-    const workers = Array.from({length:concurrency}, worker);
-    await Promise.all(workers);
-    catalog = results;
-    totalCount.textContent = String(catalog.length);
+    return fields.join('\t');
+  }).join('\n');
+}
 
-    buildDifficultyButtons();
-    updateMatchCount();
-  }
-
-  function buildDifficultyButtons(){
-    diffRow.innerHTML = '';
-    const uniq = Array.from(new Set(catalog.map(x => x.diff).filter(n => Number.isFinite(n)))).sort((a,b)=>a-b);
-    (uniq.length ? uniq : [1,2,3,4,5]).forEach(n => addDiffBtn(n));
-  }
-
-  function addDiffBtn(n){
-    const b = document.createElement('button');
-    b.className = 'btn';
-    b.dataset.filter = 'diff';
-    b.dataset.value  = String(n);
-    b.textContent = 'Lvl ' + n;
-    diffRow.appendChild(b);
-  }
-
-  // ---------- Selected filters state ----------
-  const selected = {
-    dir: new Set(),   // 'ascending' | 'descending'
-    mode: new Set(),  // 'major' | 'minor'
-    diff: new Set()   // '1','2',...
-  };
-
-  function toggleBtn(btn){
-    const group = btn?.dataset?.filter;
-    const val   = btn?.dataset?.value;
-    const set   = group ? selected[group] : undefined;
-    if (!set || !val) return;
-
-    if (set.has(val)) {
-      set.delete(val);
-      btn.classList.remove('selected');
-    } else {
-      set.add(val);
-      btn.classList.add('selected');
-    }
-    updateMatchCount();
-  }
-
-  [dirRow, modeRow, diffRow].forEach(row => {
-    row.addEventListener('click', (e) => {
-      const btn = e.target.closest('button.btn');
-      if (!btn || !row.contains(btn)) return;
-      if (!btn.dataset.filter || !btn.dataset.value) return;
-      toggleBtn(btn);
-    });
-  });
-
-  function matchesFilters(item){
-    if (selected.dir.size){
-      if (!item.dir || !selected.dir.has(item.dir)) return false;
-    }
-    if (selected.mode.size){
-      if (!item.mode || !selected.mode.has(item.mode)) return false;
-    }
-    if (selected.diff.size){
-      const d = String(item.diff ?? '');
-      if (!selected.diff.has(d)) return false;
-    }
-    return true;
-  }
-
-  function currentMatches(){ return catalog.filter(matchesFilters); }
-  function updateMatchCount(){ matchCount.textContent = String(currentMatches().length); }
-
-  clearBtn.addEventListener('click', () => {
-    selected.dir.clear(); selected.mode.clear(); selected.diff.clear();
-    document.querySelectorAll('.btn.selected').forEach(b => b.classList.remove('selected'));
-    updateMatchCount();
-  });
-
-  // ---------- Key-range UI ----------
-  const keyButtons = [];
-  const selectedKeyCounts = new Set(); // integers 0..7
-
-  function buildKeyRangeChips(){
-    keyRangeRow.innerHTML = '';
-    keyButtons.length = 0;
-    selectedKeyCounts.clear();
-    for (let n = 0; n <= 7; n++){
-      const b = document.createElement('button');
-      b.className = 'key-chip';
-      b.dataset.count = String(n);
-      b.textContent = `${n}#/${n}b`;
-      keyRangeRow.appendChild(b);
-      keyButtons.push(b);
-      selectedKeyCounts.add(n);
-    }
-  }
-
-  keyRangeRow.addEventListener('click', (e) => {
-    const b = e.target.closest('.key-chip');
-    if (!b || !keyRangeRow.contains(b)) return;
-    const n = parseInt(b.dataset.count, 10);
-    if (Number.isNaN(n)) return;
-    if (selectedKeyCounts.has(n)){
-      selectedKeyCounts.delete(n);
-      b.classList.add('off');
-    } else {
-      selectedKeyCounts.add(n);
-      b.classList.remove('off');
-    }
-  });
-
-  keySelectAllBtn.addEventListener('click', () => {
-    keyButtons.forEach(b => b.classList.remove('off'));
-    selectedKeyCounts.clear();
-    for (let n=0;n<=7;n++) selectedKeyCounts.add(n);
-  });
-
-  keySelectNoneBtn.addEventListener('click', () => {
-    keyButtons.forEach(b => b.classList.add('off'));
-    selectedKeyCounts.clear();
-  });
-
-  buildKeyRangeChips();
-
-  // ---------- Random selection & render ----------
-  function pickRandom(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
-  function pickRandomTonicForMode(mode){
-    const counts = Array.from(selectedKeyCounts.values()).sort((a,b)=>a-b);
-    if (!counts.length) return '';
-    const count = pickRandom(counts);
-    const pool = (mode === 'minor' ? MINOR_BY_COUNT[count] : MAJOR_BY_COUNT[count]) || [];
-    return pool.length ? pickRandom(pool) : '';
-  }
-
-  randomBtn.addEventListener('click', async () => {
-    const pool = currentMatches();
-    if (!pool.length){
-      setStatus('No matching files. Adjust filters or clear them.', true);
+// Courtesy from spine-4 (q / Nq) + conflict detection
+function applyCourtesyFromSpine4(krnText){
+  const lines = krnText.split(/\r?\n/);
+  const out = [];
+  let afterKey = false;
+  let lastBass = null;
+  const conflicts = [];
+  const firstKeyMatch = krnText.match(/^\*([A-Ga-g])([#\u266f-]{0,2})\s*:/m);
+  const origKey = firstKeyMatch ? (firstKeyMatch[1] + (firstKeyMatch[2]||'')) : null;
+  const origMode = firstKeyMatch ? (firstKeyMatch[1] === firstKeyMatch[1].toUpperCase() ? 'major':'minor') : 'major';
+  lines.forEach((line, idx) => {
+    if (!line.includes('\t')) {
+      if (!afterKey && KEY_TOKEN_RE.test(line.trim())) afterKey = true;
+      out.push(line);
       return;
     }
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-
-    // Prepare (GENERALIZED suppression after first *X:)
-    const prepared = suppressThirdFourthSpinesAfterKey(pick.text);
-
-    currentKrn = prepared;
-    currentEntry = pick;
-
-    const m = pick.mode || modeFromKern(currentKrn) || 'major';
-    const tonic = pickRandomTonicForMode(m);
-
-    // Title & key pills
-    updatePillsFromCatalogEntry(pick);
-    updateKeyPill(tonic || '', m);
-
-    if (tonic && !hasKeyDesignationKRn(currentKrn) && !hasKeySigKRn(currentKrn)) {
-      setStatus('File lacks *k[]/*X: — tonic-based transpose may be ignored', true);
-    } else {
-      setStatus(`Loaded: ${pick.path} — mode=${m}${tonic?`, target=${tonic}`:''}`);
+    const fields = line.split('\t');
+    if (!afterKey) {
+      if (fields.some(f => KEY_TOKEN_RE.test((f||'').trim()))) {
+        afterKey = true;
+        out.push(line);
+        return;
+      }
+      out.push(line);
+      return;
     }
-    renderWithTonic(tonic || '', m);
+    // Track bass (spine-1)
+    const f0 = (fields[0]||'').trim();
+    const isData = (tok) => tok && tok !== '.' && !tok.startsWith('*') && !tok.startsWith('=');
+    if (isData(f0)) {
+      const m = f0.match(/([A-Ga-g])([#\u266f-]{0,2})$/);
+      if (m) {
+        const letter = m[1].toUpperCase();
+        const accraw = (m[2]||'') || 'n';
+        lastBass = { letter, acc: accraw, semitone: spelledToSemitone(letter, accraw) };
+      }
+    }
+    if (fields.length >= 4 && origKey && lastBass) {
+      const s3 = (fields[2] ?? '').trim();
+      const s4 = (fields[3] ?? '').trim();
+      const s3Has = isData(s3);
+      const s4Has = isData(s4);
+      if (s3Has && s4Has) {
+        conflicts.push({ line: idx+1, s3, s4 });
+        out.push(fields.join('\t'));
+        return;
+      }
+      if (s4Has) {
+        const tokens = s4.split(/\s+/);
+        const mapped = tokens.map(tok => {
+          if (tok === 'q') {
+            const dia = diatonicSpelling(origKey, origMode, lastBass, 3);
+            return dia.acc; // accidental for diatonic third
+          }
+          const mq = tok.match(/^(\d+)q$/);
+          if (mq) {
+            const N = parseInt(mq[1], 10);
+            const dia = diatonicSpelling(origKey, origMode, lastBass, N);
+            return String(N) + dia.acc;
+          }
+          return tok;
+        });
+        fields[1] = mapped.join(' ');
+      }
+    }
+    out.push(fields.join('\t'));
+  });
+  return { text: out.join('\n'), conflicts };
+}
+
+// ------------- Resolve q/Nq after modern override, using spelled interval -------------
+function resolveQInSpine2(krnText, targetTonic, targetMode){
+  if (!targetTonic) return krnText;
+
+  const lines = krnText.split(/\r?\n/);
+  const out = [];
+  let afterKey = false;
+  let lastBass = null;
+
+  // Original key
+  const firstKeyMatch = krnText.match(/^\*([A-Ga-g])([#\u266f\-b]{0,2})\s*:/m);
+  const origKey = firstKeyMatch
+    ? normalizeTonicForHumdrum(firstKeyMatch[1] + (firstKeyMatch[2]||''))
+    : null;
+
+  // Spelled key→key interval (no semitone-delta guessing)
+  let spelledInterval = null;
+  try {
+    if (origKey && targetTonic) {
+      spelledInterval = computeKeyToKeyInterval(origKey, targetTonic);
+    }
+  } catch(e){
+    spelledInterval = null;
+  }
+
+  const isData = (tok) => tok && tok !== '.' && !tok.startsWith('*') && !tok.startsWith('=') && tok !== '*-';
+
+  lines.forEach((line) => {
+    if (!line.includes('\t')) {
+      if (!afterKey && KEY_TOKEN_RE.test(line.trim())) afterKey = true;
+      out.push(line);
+      return;
+    }
+    const fields = line.split('\t');
+
+    if (!afterKey) {
+      if (fields.some(f => KEY_TOKEN_RE.test((f||'').trim()))) {
+        afterKey = true;
+        out.push(line);
+        return;
+      }
+      out.push(line);
+      return;
+    }
+
+    // Track last bass (original spelled bass on this row)
+    const f0 = (fields[0]||'').trim();
+    if (isData(f0)) {
+      const stripped = String(f0).replace(/^[0-9]+[\.]*/,'').replace(/[^A-Ga-g#\u266f\-b]*$/,'');
+      const m = stripped.match(/([A-Ga-g])([#\u266f\-b]{0,2})$/);
+      if (m) {
+        const letter = m[1].toUpperCase();
+        const accraw = (m[2]||'').replace(/bb/g,'--').replace(/b/g,'-').replace(/\u266f/g,'#') || 'n';
+        lastBass = { letter, acc: accraw, semitone: spelledToSemitone(letter, accraw) };
+      }
+    }
+
+    // Resolve q / Nq in spine-2 using *transposed spelled bass*
+    if (fields.length >= 2) {
+      const s2 = (fields[1]||'').trim();
+      if (isData(s2)) {
+        const tokens = s2.split(/\s+/);
+        const mapped = tokens.map(tok => {
+          if (tok === 'q' || /^(\d+)q$/.test(tok)) {
+            if (!lastBass || !spelledInterval) return tok;
+            const newBass = transposeSpelledPitchByInterval(lastBass.letter, lastBass.acc, spelledInterval);
+            if (!newBass) return tok;
+            const N = (tok === 'q') ? 3 : parseInt(tok.match(/^(\d+)q$/)[1], 10);
+            const dia = diatonicSpelling(normalizeTonicForHumdrum(String(targetTonic).trim()), targetMode, newBass, N);
+            return (tok === 'q') ? (dia.acc || 'n') : (String(N) + (dia.acc || 'n'));
+          }
+          return tok;
+        });
+        fields[1] = mapped.join(' ');
+      }
+    }
+
+    out.push(fields.join('\t'));
   });
 
-  // ---------- Initial load + indexing ----------
-  const paths = await fetchList();
-  if (paths.length){
-    setStatus('Indexing tunes.json…');
-    await buildCatalog(paths, 4);
-    setStatus('Index complete — choose filters & key range, then click “New Bass Line”.');
+  return out.join('\n');
+}
+
+// -------------------- Figure-aware transform (spines 1 & 2) --------------------
+function transformFiguresForTonicWithTrace(originalKrn, targetTonic, targetMode){
+  traceLog(`TRANSPOSE START => targetTonic=${targetTonic} targetMode=${targetMode}`);
+
+  const origKeyMatch = originalKrn.match(/^\*([A-Ga-g])([#\u266f-]{0,2})\s*:/m);
+  const origTonicStr = origKeyMatch
+    ? normalizeTonicForHumdrum(origKeyMatch[1] + (origKeyMatch[2]||'')) 
+    : null;
+
+  if (!origTonicStr) {
+    traceLog('ERROR: original key token not found; abort');
+    return originalKrn;
+  }
+
+  const origParsed = parseTonicString(origTonicStr);
+  const targetParsed = parseTonicString(normalizeTonicForHumdrum(String(targetTonic || '').trim()));
+
+  if (!origParsed || !targetParsed) {
+    traceLog('ERROR: parse tonic failed');
+    return originalKrn;
+  }
+
+  // Spelled interval between keys (letter-preserving)
+  let spelledInterval = null;
+  try {
+    spelledInterval = computeKeyToKeyInterval(origTonicStr, targetTonic);
+  } catch (e) {
+    traceLog('ERROR: key->key interval failed: ' + e.message);
+    return originalKrn;
+  }
+
+  const lines = originalKrn.split(/\r?\n/);
+  let afterKey = false;
+  let lastBass = null; // original spelled bass
+  const outLines = [];
+
+  lines.forEach((line, lineno) => {
+    if (!line.includes('\t')) {
+      if (!afterKey && KEY_TOKEN_RE.test(line.trim())) afterKey = true;
+      outLines.push(line);
+      return;
+    }
+    const fields = line.split('\t');
+
+    if (!afterKey) {
+      if (fields.some(f => KEY_TOKEN_RE.test((f||'').trim()))) {
+        afterKey = true;
+        outLines.push(line);
+        return;
+      }
+      outLines.push(line);
+      return;
+    }
+
+    // Bass from spine-1 (original spelled bass)
+    const f0 = (fields[0]||'').trim();
+    if (f0 && f0 !== '.' && !f0.startsWith('*') && !f0.startsWith('=')) {
+      const m = f0.match(/([A-Ga-g])([#\u266f-]{0,2})$/);
+      if (m) {
+        const letter = m[1].toUpperCase();
+        const accraw = (m[2]||'') || 'n';
+        lastBass = { letter, acc: accraw, semitone: spelledToSemitone(letter, accraw) };
+      }
+    }
+
+    // Target spelled bass via *spelled* interval (always try to compute)
+    let newBassSpelled = null;
+    if (lastBass && spelledInterval) {
+      newBassSpelled = transposeSpelledPitchByInterval(lastBass.letter, lastBass.acc, spelledInterval);
+      if (!newBassSpelled) {
+        traceLog(`ERROR: cannot spell new bass for ${lastBass.letter}${lastBass.acc} by interval ${spelledInterval.number}${spelledInterval.quality}; leaving row unchanged`);
+      }
+    }
+
+    // Process spine-2 only
+    if (fields.length >= 2) {
+      const originalCell = fields[1] || '';
+      const tokens = originalCell.trim() === '' ? [] : originalCell.trim().split(/\s+/);
+
+      const newTokens = tokens.map(tok => {
+        // Keep-as-is tokens: \d+#\|, numeral ending with / or \, and literal "5-" only in historic mode
+        if (/^\d+#\|$/.test(tok) || /^\d+[\/\\]$/.test(tok) || (ACC_MODE === 'historic' && /^5-$/.test(tok))) {
+          return tok;
+        }
+
+        // Accidental-only (standalone) — refers to diatonic third
+        if (/^(--|##|#|-|n)$/.test(tok)) {
+          const numeral = 3;
+          if (!lastBass || !newBassSpelled) {
+            traceLog(`WARN: standalone accidental ${tok} but bass unknown or cannot spell new bass; leaving token as-is`);
+            return tok;
+          }
+          try {
+            const origDiat = diatonicSpelling(origTonicStr, origParsed.mode, lastBass, numeral);
+            const origDiatSem = spelledToSemitone(origDiat.letter, origDiat.acc);
+            const producedSem = spelledToSemitone(origDiat.letter, tok);
+
+            // STASIS: produced equals diatonic
+            if (producedSem === origDiatSem) {
+              const tgtDiat = diatonicSpelling(normalizeTonicForHumdrum(String(targetTonic || '').trim()), targetMode, newBassSpelled, numeral);
+              return tgtDiat.acc;
+            }
+
+            let dirRaw = (producedSem - origDiatSem + 12) % 12;
+            let dir;
+            if (dirRaw === 0) dir = 0;
+            else if (dirRaw === 1) dir = +1;
+            else if (dirRaw === 11) dir = -1;
+            else dir = (dirRaw <= 6) ? dirRaw : dirRaw - 12;
+            if (Math.abs(dir) > 2) {
+              traceLog(`ERROR: standalone accidental ${tok} produced dir=${dir} outside allowed range; leaving token unchanged`);
+              return tok;
+            }
+
+            const tgtDiat = diatonicSpelling(normalizeTonicForHumdrum(String(targetTonic || '').trim()), targetMode, newBassSpelled, numeral);
+            const finalSem = ((tgtDiat.semitone + dir)%12+12)%12;
+            const finalAcc = semitoneToAccidentalForLetter(tgtDiat.letter, finalSem);
+            if (!finalAcc) {
+              traceLog(`ERROR: cannot safely spell altered diatonic ${numeral} above ${newBassSpelled.letter}${newBassSpelled.acc} in ${targetTonic}; leaving token ${tok} unchanged`);
+              return tok;
+            }
+            return finalAcc;
+          } catch (e) {
+            traceLog(`ERROR (standalone accidental): ${e.message}; leaving ${tok} unchanged`);
+            return tok;
+          }
+        }
+
+        // Numeral with optional accidental
+        const m2 = tok.match(/^(\d+)(--|##|#|-|n)?$/);
+        if (!m2) return tok;
+
+        const numeral = parseInt(m2[1], 10);
+        const accPart = m2[2] || '';
+
+        if (!lastBass || !newBassSpelled) {
+          traceLog(`WARN: numeral ${tok} but no bass/new-bass-known; leaving token as-is`);
+          return tok;
+        }
+        if (!accPart) return tok; // unaltered, port as-is
+
+        try {
+          const origDiat = diatonicSpelling(origTonicStr, origParsed.mode, lastBass, numeral);
+          const origDiatSem = spelledToSemitone(origDiat.letter, origDiat.acc);
+          const producedSem = spelledToSemitone(origDiat.letter, accPart);
+
+          // STASIS
+          if (producedSem === origDiatSem) {
+            const tgtDiat = diatonicSpelling(normalizeTonicForHumdrum(String(targetTonic || '').trim()), targetMode, newBassSpelled, numeral);
+            return String(numeral) + tgtDiat.acc;
+          }
+
+          let dirRaw = (producedSem - origDiatSem + 12) % 12;
+          let dir;
+          if (dirRaw === 0) dir = 0;
+          else if (dirRaw === 1) dir = +1;
+          else if (dirRaw === 11) dir = -1;
+          else dir = (dirRaw <= 6) ? dirRaw : dirRaw - 12;
+
+          if (dir === 0) return tok;
+          if (Math.abs(dir) > 2) {
+            traceLog(`ERROR: alteration for ${tok} yields dir=${dir} outside allowed range; leaving token unchanged`);
+            return tok;
+          }
+
+          const tgtDiat = diatonicSpelling(normalizeTonicForHumdrum(String(targetTonic || '').trim()), targetMode, newBassSpelled, numeral);
+          const finalSem = ((tgtDiat.semitone + dir)%12+12)%12;
+          const finalAcc = semitoneToAccidentalForLetter(tgtDiat.letter, finalSem);
+          if (!finalAcc) {
+            traceLog(`ERROR: cannot safely spell transformed numeral ${numeral} above ${tgtDiat.letter} in ${targetTonic}; leaving ${tok} unchanged`);
+            return tok;
+          }
+          return String(numeral) + finalAcc;
+        } catch (e) {
+          traceLog(`ERROR (numeral transform): ${e.message}; leaving ${tok} unchanged`);
+          return tok;
+        }
+      });
+
+      fields[1] = newTokens.join(' ');
+    }
+
+    // Suppress spines 3 & 4
+    for (let i = 2; i <= 3 && i < fields.length; i++){
+      const tok = (fields[i]||'').trim();
+      if (tok !== '*-') fields[i] = '.';
+    }
+
+    outLines.push(fields.join('\t'));
+  });
+
+  traceLog('TRANSPOSE END');
+  return outLines.join('\n');
+}
+
+// -------------------- Catalog / filters / UI --------------------
+function capitalize(s){ return String(s || '').replace(/^\w/, c => c.toUpperCase()); }
+function updatePillsFromCatalogEntry(entry){
+  function uc(s){ return String(s||'').replace(/^\w/, c => c.toUpperCase()); }
+  const dirWord = entry?.dir ? uc(entry.dir) : '';
+  const modeWord = entry?.mode ? uc(entry.mode) : '';
+  const lvl = entry?.diff != null ? String(entry.diff) : '';
+  const leftParts = [dirWord, modeWord].filter(Boolean).join(' ').trim();
+  const core = 'Rule of the Octave';
+  let pieces = [];
+  if (leftParts) pieces.push(leftParts);
+  pieces.push(core);
+  if (lvl) pieces.push(lvl);
+  const finalText = pieces.join(' ');
+  titlePill.innerHTML = escapeHtml(finalText || 'No title');
+}
+function formatKeyName(tonic, mode){
+  if (!tonic) return 'original';
+  const m = String(tonic).trim().match(/^([A-Ga-g])(.+)?$/);
+  if (!m) return tonic + ' ' + (mode === 'minor' ? 'minor' : 'major');
+  let letter = m[1], acc = m[2] || '';
+  acc = acc.replace(/bb/g, '♭♭').replace(/b/g, '♭').replace(/#/g, '♯').replace(/--/g,'♭♭').replace(/-/g,'♭');
+  const root = (mode === 'minor') ? letter.toLowerCase() : letter.toUpperCase();
+  return root + acc + ' ' + (mode === 'minor' ? 'minor' : 'major');
+}
+function updateKeyPill(tonic, mode){
+  keyPillValue.textContent = formatKeyName(tonic, mode);
+  if (!tonic) document.getElementById('keyPill').style.display = 'none';
+  else document.getElementById('keyPill').style.display = '';
+}
+
+let catalog = [];
+let currentKrn = '';
+let currentEntry = null;
+let lastTargetTonic = '';
+let lastTargetMode = '';
+let lastOriginalKey = '';
+let lastOriginalMode = '';
+let lastRenderTranspose = ''; // what was sent to verovio transpose (tonic or numeric)
+let transposePreferFlats = false;
+let currentRenderSemitoneShift = 0;
+
+// -------------------- Fetch helpers --------------------
+async function fetchList(){
+  try {
+    const r = await fetch('tunes.json?_=' + Date.now(), { cache:'no-cache' });
+    if (!r.ok) return [];
+    const arr = await r.json();
+    const list = Array.isArray(arr) ? arr : (Array.isArray(arr.files) ? arr.files : []);
+    return (list || []).map(x => String(x).replace(/^\/+/, ''));
+  } catch(e){
+    return [];
+  }
+}
+async function fetchText(path){
+  const p = path.startsWith('tunes/') ? path : 'tunes/' + path;
+  const r = await fetch(p + '?_=' + Date.now(), { cache:'no-cache' });
+  if (!r.ok) throw new Error('fetch failed: ' + p);
+  const t = await r.text();
+  return { path: p, text: t };
+}
+function metaFromHeader(krn){
+  const lines = krn.split(/\r?\n/).slice(0, 120);
+  let dir = null, diff = null, title = null, mode = null;
+  for (const ln of lines){
+    const s = (ln||'').trim();
+    if (!s || !s.startsWith('!!')) continue;
+    const titleMatch = s.match(/^!!\s*(?:Title|T)\s+(.*)$/i);
+    if (titleMatch && titleMatch[1] && !title){
+      title = titleMatch[1].trim();
+      continue;
+    }
+    const numMatch = s.match(/^!!\s*Number\s+(\d+)\s*$/i);
+    if (numMatch && numMatch[1]){
+      diff = parseInt(numMatch[1], 10);
+      continue;
+    }
+    const dirLine = s.match(/^!!\s*Dir\b(.*)$/i);
+    if (dirLine){
+      const rest = dirLine[1];
+      if (/ascending/i.test(rest)) dir = 'ascending';
+      if (/descending/i.test(rest)) dir = 'descending';
+      if (/major/i.test(rest)) mode = 'major';
+      if (/minor/i.test(rest)) mode = 'minor';
+      continue;
+    }
+  }
+  if (!mode) {
+    const m = krn.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m);
+    if (m) mode = (m[1] === m[1].toUpperCase()) ? 'major' : 'minor';
+  }
+  return { dir, mode, diff, title };
+}
+async function buildCatalog(paths, concurrency=4){
+  catalog = [];
+  let i = 0;
+  const results = [];
+  async function worker(){
+    while (i < paths.length){
+      const idx = i++;
+      const raw = paths[idx];
+      if (!/\.(krn|hum|txt)$/i.test(raw)) continue;
+      try {
+        const { path, text } = await fetchText(raw);
+        const meta = metaFromHeader(text);
+        results.push({ path, dir: meta.dir, mode: meta.mode, diff: meta.diff, title: meta.title, text });
+      } catch(e){ /* skip */ }
+    }
+  }
+  await Promise.all(Array.from({length:concurrency}, worker));
+  catalog = results;
+  if (totalCount) totalCount.textContent = String(catalog.length);
+  updateMatchCount();
+}
+
+function pickRandom(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+
+function matchesFilters(item){
+  if (selected.dir.size){
+    if (!item.dir || !selected.dir.has(item.dir)) return false;
+  }
+  if (selected.mode.size){
+    if (!item.mode || !selected.mode.has(item.mode)) return false;
+  }
+  if (selected.diff.size){
+    const d = String(item.diff ?? '');
+    if (!selected.diff.has(d)) return false;
+  }
+  return true;
+}
+
+const selected = { dir: new Set(), mode: new Set(), diff: new Set() };
+
+function currentMatches(){ return catalog.filter(matchesFilters); }
+function updateMatchCount(){
+  if (matchCount) matchCount.textContent = String(currentMatches().length);
+}
+
+// -------------------- Key button helpers (fixed) --------------------
+function refreshKeyButtonsUI(){
+  keyButtons.forEach(btn => {
+    const c = Number(btn.dataset.count);
+    if (enabledCounts.has(c)) btn.classList.add('selected');
+    else btn.classList.remove('selected');
+  });
+}
+refreshKeyButtonsUI();
+keyButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const c = Number(btn.dataset.count);
+    if (enabledCounts.has(c)) {
+      enabledCounts.delete(c);
+    } else {
+      enabledCounts.add(c);
+    }
+    refreshKeyButtonsUI();
+    updateMatchCount();
+  });
+});
+selectAllKeysBtn.addEventListener('click', () => {
+  for (let i=0;i<=7;i++) enabledCounts.add(i);
+  refreshKeyButtonsUI();
+  updateMatchCount();
+});
+selectNoneKeysBtn.addEventListener('click', () => {
+  enabledCounts.clear();
+  refreshKeyButtonsUI();
+  updateMatchCount();
+});
+
+// -------------------- Build allowed tonics --------------------
+function buildAllowedTonicsForMode(mode){
+  const byCount = (mode === 'minor') ? MINOR_BY_COUNT : MAJOR_BY_COUNT;
+  const allowed = [];
+  for (const cStr of Object.keys(byCount)){
+    const c = Number(cStr);
+    if (!enabledCounts.has(c)) continue;
+    for (const tonic of byCount[c] || []) allowed.push(tonic);
+  }
+  return allowed;
+}
+
+// -------------------- Rendering --------------------
+function getCurrentScaleSpacing(){
+  const scale = (scaleSlider && scaleSlider.value) ? Number(scaleSlider.value) : baseOptions.scale;
+  const spacingLinear = (spacingSlider && spacingSlider.value) ? Number(spacingSlider.value)/100 : baseOptions.spacingLinear;
+  return { scale, spacingLinear };
+}
+function tonicToVerovioAscii(tonic) {
+  if (!tonic) return '';
+  return String(tonic)
+    .replace(/--/g, 'bb')
+    .replace(/-/g, 'b')
+    .replace(/\u266d/g, 'b')
+    .replace(/\u266f/g, '#');
+}
+function renderWithVerovio(krnText, tonicForRender){
+  try {
+    const { scale, spacingLinear } = getCurrentScaleSpacing();
+    // If currentRenderSemitoneShift is non-zero, prefer numeric transpose string; otherwise send spelled tonic.
+    let verovioTonic = '';
+    if (currentRenderSemitoneShift && !isNaN(Number(currentRenderSemitoneShift))) {
+      verovioTonic = String(Number(currentRenderSemitoneShift));
+      lastRenderTranspose = verovioTonic;
+    } else {
+      verovioTonic = tonicForRender ? tonicToVerovioAscii(String(tonicForRender)) : '';
+      lastRenderTranspose = verovioTonic || '';
+    }
+    if (vrv) {
+      vrv.setOptions({ ...baseOptions, scale: Number(scale), spacingLinear: Number(spacingLinear), transpose: verovioTonic });
+      const svg = vrv.renderData(krnText || '', {});
+      svgHost.innerHTML = svg;
+    } else {
+      svgHost.textContent = '(verovio not initialized) — preview disabled';
+    }
+  } catch (e) {
+    svgHost.textContent = 'Render failed: ' + (e?.message || e);
+    traceLog('renderWithVerovio error: ' + (e?.message || e));
+  }
+}
+
+// -------------------- Pipeline --------------------
+function runPipelineForEntry(entry, tonic, m){
+  const originalAbsolute = entry.text;
+
+  // Modern override
+  let prepared = entry.text;
+  if (ACC_MODE === 'modern') {
+    prepared = applyModernOverride(prepared);
+    modeTagline.innerHTML = 'Created for the University of Iowa Organ Studio';
   } else {
-    setStatus('No tunes.json found.');
+    modeTagline.innerHTML = 'Created for the University of Iowa Organ Studio';
+  }
+  historicalStatus.textContent = `Historical=${ACC_MODE==='historic' ? 'TRUE' : 'FALSE'}`;
+
+  // Courtesy
+  const { text: withCourtesy, conflicts } = applyCourtesyFromSpine4(prepared);
+  if (conflicts.length){
+    const msg = `ERROR: figures present in both spine-3 and spine-4 on ${conflicts.length} row(s) — e.g., line ${conflicts[0].line}.`;
+    setStatus(msg, true);
+    traceLog(msg);
+  } else {
+    setStatus(`Loaded: ${entry.path} — mode=${m}${tonic?', target='+tonic:''}`);
   }
 
-  // If nothing loaded yet, show a tiny sample
-  if (!currentKrn) {
-    const rawSample = `**kern\t**fb\t**text\t**text
+  // Resolve q/Nq now that s3→s2 may have occurred
+  const withResolvedQ = resolveQInSpine2(withCourtesy, tonic, m);
+
+  // Suppress spines 3 & 4 (text to Verovio)
+  const suppressed = suppressThirdFourthSpinesAfterKey(withResolvedQ);
+  const krnSentToVerovio = suppressed;
+
+  // Figure-aware transform using spelled interval + chromatic-bass support
+  const transformed = transformFiguresForTonicWithTrace(
+    krnSentToVerovio,
+    String(tonic || '').trim(),
+    m
+  );
+  currentKrn = transformed;
+
+  // Humdrum panel
+  humPanel.textContent = '';
+  humPanel.textContent += '## 1) ORIGINAL .krn (absolute source)\n\n';
+  humPanel.textContent += originalAbsolute + '\n\n';
+  humPanel.textContent += '## 2) .krn sent to Verovio (after modern override + courtesy + q-resolve; then suppressed)\n\n';
+  humPanel.textContent += krnSentToVerovio + '\n\n';
+  humPanel.textContent += `## TARGET KEY: ${formatKeyName(tonic, m)}\n\n`;
+  humPanel.textContent += '## 3) Transpose output (after figure-aware transform)\n\n';
+  humPanel.textContent += currentKrn + '\n\n';
+  humPanel.textContent += `## 4) Historical mode status: Historical=${ACC_MODE==='historic' ? 'TRUE' : 'FALSE'}\n`;
+
+  // Remember keys so toggles can act
+  lastTargetTonic = tonic;
+  lastTargetMode = m;
+
+  // Reset numeric render shift (octave) when we start a new pipeline run
+  currentRenderSemitoneShift = 0;
+
+  // Update badge and render
+  updateKeyPill(tonic, m);
+  renderWithVerovio(currentKrn, tonic);
+}
+
+// -------------------- Sample / Random --------------------
+const sample = `**kern\t**fb\t**text\t**text
 !!\t\tactual acc.\tforce diatonic accidental
-!! Dir\tAscending Minor
+!! Dir\tDescending Minor
 !! Title\tRule of the Octave
-!! Number\t6
+!! Number\t4
 *clefF4\t*\t*\t*
-*k[]\t*k[]\t*k[]\t*k[]
+*k[]\t*k[]\t*k[]\t*k:
 *a:\t*a:\t*a:\t*a:
-=1\t=1\t=1\t=1
+=1\t=1\t.\t.
 4AA\t5\t.\t.
-.\t6\\ 5-\t6# 5-\t..
-4BB\t6\t.\t.
-4C\t6 5\t.\t.
-4D\t8 #\t.\t.
-.\t7 #\t.\t.
-4E\t9\\\t9#\t.
+4BB\t7\t.\t.
+4C\t6\t.\t.
+4D\t9\t.\t.
 .\t8\t.\t.
-4F#\t7\t.\t.
-.\t6\\\t6#\t.
-4G#\t5-\t5n\t.
+4E\t6 4\t.\t.
+.\t5 #\t.\t.
+4F#\t6\t.\t.
+4G#\t6 5\t.\t.
 4A\t.\t.\t.
-=|\t=|\t=|\t=|
-*-\t*-\t*-\t*-
-`;
-    const meta = metaFromHeader(rawSample);
-    currentEntry = { path: 'sample', text: rawSample, dir: meta.dir, mode: meta.mode, diff: meta.diff, title: meta.title };
+=|\t=|\t.\t.
+*-\t*-\t*-\t*-`;
 
-    // Apply generalized suppression to sample, too
-    currentKrn = suppressThirdFourthSpinesAfterKey(rawSample);
+// -------------------- Enharmonic toggle sets --------------------
+const ENH_MAJOR_PAIRS = [['C#','Db'], ['F#','Gb']];
+const ENH_MINOR_PAIRS = [['Eb','D#'], ['Ab','G#'], ['A#','Bb']];
 
-    updatePillsFromCatalogEntry(currentEntry);
-    humPanel.textContent = currentKrn;
-    renderWithTonic('', meta.mode || 'major');
+function findEnhPairContaining(name, mode){
+  if (!name) return null;
+  const norm = normalizeTonicForHumdrum(name);
+  const pairs = (mode === 'minor') ? ENH_MINOR_PAIRS : ENH_MAJOR_PAIRS;
+  for (const pair of pairs){
+    for (const p of pair){
+      if (normalizeTonicForHumdrum(p) === norm) return pair;
+    }
   }
+  return null;
+}
+
+// -------------------- Semitone/tonic helpers for tp+/- --------------------
+function semitoneToTonicName(targetSemitone, mode, preferFlats){
+  const byCount = (mode === 'minor') ? MINOR_BY_COUNT : MAJOR_BY_COUNT;
+  const candidates = [];
+  for (const arr of Object.values(byCount)){
+    for (const t of arr) candidates.push(t);
+  }
+  const matches = candidates.filter(t => {
+    const n = normalizeTonicForHumdrum(t);
+    const p = parseTonicString(n);
+    if (!p) return false;
+    return spelledToSemitone(p.letter, p.acc) === ((targetSemitone%12)+12)%12;
+  });
+  if (!matches.length) return null;
+  if (matches.length === 1) return matches[0];
+  const flats = matches.filter(x => /b|--|-/.test(x));
+  const sharps = matches.filter(x => /#/.test(x));
+  if (preferFlats && flats.length) return flats[0];
+  if (!preferFlats && sharps.length) return sharps[0];
+  return matches[0];
+}
+
+function pickSpelledTonicBySemitoneStep(currentSpelledTonic, mode, step){
+  const baseParsed = parseTonicString(normalizeTonicForHumdrum(currentSpelledTonic));
+  if (!baseParsed) return null;
+  const baseSem = spelledToSemitone(baseParsed.letter, baseParsed.acc);
+  const newSem = ((baseSem + step) % 12 + 12) % 12;
+  const candidatesAllowed = buildAllowedTonicsForMode(mode);
+  for (const cand of candidatesAllowed){
+    const p = parseTonicString(normalizeTonicForHumdrum(cand));
+    if (!p) continue;
+    if (spelledToSemitone(p.letter, p.acc) === newSem) return normalizeTonicForHumdrum(cand);
+  }
+  const standard = semitoneToTonicName(newSem, mode, transposePreferFlats);
+  if (standard) return normalizeTonicForHumdrum(standard);
+  if (candidatesAllowed && candidatesAllowed.length){
+    const normList = candidatesAllowed.map(x => normalizeTonicForHumdrum(x));
+    let idx = normList.indexOf(normalizeTonicForHumdrum(currentSpelledTonic));
+    if (idx < 0) idx = 0;
+    const next = normList[(idx + (step>0?1:-1) + normList.length) % normList.length];
+    return normalizeTonicForHumdrum(next);
+  }
+  return null;
+}
+
+// -------------------- Transpose control wiring --------------------
+function setTargetTonic(tonic){
+  if (!currentEntry) { traceLog('setTargetTonic: no current entry'); return; }
+  const t = normalizeTonicForHumdrum(tonic);
+  lastTargetTonic = t;
+  lastTargetMode = lastTargetMode || currentEntry.mode || 'major';
+  currentRenderSemitoneShift = 0;
+  runPipelineForEntry(currentEntry, t, lastTargetMode);
+}
+
+tpPlus.addEventListener('click', () => {
+  traceLog('tpPlus pressed (semitone up)');
+  if (!lastTargetTonic || !lastTargetMode) { traceLog('tpPlus: no current spelled tonic; nothing to do'); return; }
+  const next = pickSpelledTonicBySemitoneStep(lastTargetTonic, lastTargetMode, +1);
+  if (next) { traceLog(`tpPlus -> chosen spelled tonic ${next}`); setTargetTonic(next); } else { traceLog('tpPlus: failed to find next spelled tonic - no change'); }
+});
+tpMinus.addEventListener('click', () => {
+  traceLog('tpMinus pressed (semitone down)');
+  if (!lastTargetTonic || !lastTargetMode) { traceLog('tpMinus: no current spelled tonic; nothing to do'); return; }
+  const next = pickSpelledTonicBySemitoneStep(lastTargetTonic, lastTargetMode, -1);
+  if (next) { traceLog(`tpMinus -> chosen spelled tonic ${next}`); setTargetTonic(next); } else { traceLog('tpMinus: failed to find next spelled tonic - no change'); }
+});
+
+tpToggle.addEventListener('click', () => {
+  traceLog('tpToggle clicked');
+  if (!lastTargetTonic || !lastTargetMode) {
+    transposePreferFlats = !transposePreferFlats;
+    tpToggle.classList.toggle('active', transposePreferFlats);
+    traceLog('tpToggle: no spelled tonic loaded; toggled preferFlats=' + transposePreferFlats);
+    return;
+  }
+  const pair = findEnhPairContaining(lastTargetTonic, lastTargetMode);
+  if (!pair) {
+    transposePreferFlats = !transposePreferFlats;
+    tpToggle.classList.toggle('active', transposePreferFlats);
+    traceLog('tpToggle: no pair for ' + lastTargetTonic + '; preferFlats=' + transposePreferFlats);
+    updateKeyPill(lastTargetTonic, lastTargetMode);
+    return;
+  }
+  const norm = normalizeTonicForHumdrum(lastTargetTonic);
+  const other = normalizeTonicForHumdrum(pair[0]) === norm ? pair[1] : pair[0];
+  traceLog(`tpToggle: switching ${norm} -> ${other}`);
+  setTargetTonic(other);
+  transposePreferFlats = /b|--|-/.test(other);
+  tpToggle.classList.toggle('active', transposePreferFlats);
+});
+
+// -------------------- Octave buttons (render-only numeric transpose) --------------------
+function applyRenderSemitoneShift(delta){
+  // accumulate numeric render shifts (12 per octave)
+  currentRenderSemitoneShift = (currentRenderSemitoneShift || 0) + delta;
+  traceLog(`applyRenderSemitoneShift => ${currentRenderSemitoneShift}`);
+  // Re-render with same pipeline-output KRn, but numeric transpose to verovio.
+  renderWithVerovio(currentKrn || sample, lastTargetTonic || '');
+  // Keep key pill showing the spelled target key (do not change it)
+  updateKeyPill(lastTargetTonic || '', lastTargetMode || '');
+}
+octPlus.addEventListener('click', () => { traceLog('octPlus clicked'); applyRenderSemitoneShift(+12); });
+octMinus.addEventListener('click', () => { traceLog('octMinus clicked'); applyRenderSemitoneShift(-12); });
+
+// -------------------- Accidentals toggle re-run --------------------
+accRadios.forEach(r => {
+  r.addEventListener('change', () => {
+    if (!r.checked) return;
+    ACC_MODE = r.value === 'modern' ? 'modern' : 'historic';
+    traceLog(`Accidentals mode changed => ${ACC_MODE}`);
+    if (currentEntry && lastTargetTonic && lastTargetMode) {
+      runPipelineForEntry(currentEntry, lastTargetTonic, lastTargetMode);
+    } else {
+      modeTagline.innerHTML = (ACC_MODE === 'modern')
+        ? 'Created for the University of Iowa Organ Studio'
+        : 'Created for the University of Iowa Organ Studio';
+      historicalStatus.textContent = `Historical=${ACC_MODE==='historic' ? 'TRUE' : 'FALSE'}`;
+    }
+  });
+});
+
+// -------------------- Sample / Random wiring --------------------
+randomBtn.addEventListener('click', async () => {
+  const pick = catalog.length ? pickRandom(currentMatches()) : { path:'sample', text: sample, dir:'descending', mode:'major', diff:1, title:'Sample' };
+  currentEntry = pick;
+  const m = pick.mode || (pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1] === pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1]?.toUpperCase() ? 'major' : 'minor') || 'major';
+
+  const allowedTonics = buildAllowedTonicsForMode(m);
+  traceLog(`Allowed tonics for mode=${m}: ${JSON.stringify(allowedTonics)}`);
+
+ if (!allowedTonics.length){
+  const msg = 'No allowed keys selected for this mode. Enable one or more key-range buttons (0..7).';
+  setStatus(msg, true);
+  traceLog('ERROR: ' + msg);
+  updatePillsFromCatalogEntry(pick);
+  updateKeyPill('', m);
+  humPanel.textContent = '##original\n' + suppressThirdFourthSpinesAfterKey(pick.text) + '\n\n##transposed to [none]\n';
+  return;
+}
+
+  const tonic = normalizeTonicForHumdrum(pickRandom(allowedTonics));
+  lastTargetTonic = tonic;
+  lastTargetMode = m;
+
+  updatePillsFromCatalogEntry(pick);
+  updateKeyPill(tonic || '', m);
+  runPipelineForEntry(pick, tonic, m);
+});
+
+// -------------------- Scale / Spacing wiring --------------------
+function updateScaleValueDisplay(){
+  if (scaleValue && scaleSlider) scaleValue.textContent = String(Number(scaleSlider.value));
+}
+function updateSpacingValueDisplay(){
+  if (spacingValue && spacingSlider) spacingValue.textContent = (Number(spacingSlider.value)/100).toFixed(2);
+}
+if (scaleSlider){
+  scaleSlider.addEventListener('input', () => {
+    updateScaleValueDisplay();
+    if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic);
+    else renderWithVerovio(sample, '');
+  });
+  updateScaleValueDisplay();
+}
+if (spacingSlider){
+  spacingSlider.addEventListener('input', () => {
+    updateSpacingValueDisplay();
+    if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic);
+    else renderWithVerovio(sample, '');
+  });
+  updateSpacingValueDisplay();
+}
+if (scaleMinus) scaleMinus.addEventListener('click', ()=>{ scaleSlider.value = Math.max(10, Number(scaleSlider.value)-1); updateScaleValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
+if (scalePlus) scalePlus.addEventListener('click', ()=>{ scaleSlider.value = Math.min(120, Number(scaleSlider.value)+1); updateScaleValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
+if (scaleReset) scaleReset.addEventListener('click', ()=>{ scaleSlider.value = 50; updateScaleValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
+
+if (spacingMinus) spacingMinus.addEventListener('click', ()=>{ spacingSlider.value = Math.max(10, Number(spacingSlider.value)-1); updateSpacingValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
+if (spacingPlus) spacingPlus.addEventListener('click', ()=>{ spacingSlider.value = Math.min(80, Number(spacingSlider.value)+1); updateSpacingValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
+if (spacingReset) spacingReset.addEventListener('click', ()=>{ spacingSlider.value = 32; updateSpacingValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
+
+// -------------------- Misc UI placeholders --------------------
+if (tpMinus) tpMinus.addEventListener('click', ()=> { /* handled above */ });
+if (tpPlus) tpPlus.addEventListener('click', ()=> { /* handled above */ });
+if (tpToggle) tpToggle.addEventListener('click', ()=> { /* handled above */ });
+
+// -------------------- Init: catalog or sample --------------------
+const paths = await (async () => {
+  try { return await fetchList(); } catch(e){ return []; }
+})();
+if (paths.length){
+  setStatus('Indexing tunes.json…');
+  await buildCatalog(paths, 4);
+  setStatus('Index complete — choose filters & key range, then click “New Bass Line”.');
+} else {
+  setStatus('No tunes.json found — using sample.');
+}
+
+if (!currentKrn) {
+  currentEntry = { path:'sample', text: sample, dir:'descending', mode:'major', diff:1, title:'Sample' };
+  const prepared = suppressThirdFourthSpinesAfterKey(sample);
+  humPanel.textContent = '##original\n' + prepared + '\n\n##transposed to [none]\n';
+  renderWithVerovio(sample, '');
+  setStatus('ready — toggle TRACE and click "New Bass Line"');
+}
+
 })();
 </script>
 </body>
