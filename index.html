@@ -504,8 +504,6 @@ humdrum-toggle {
     </div>
   </div>
 
-  
-
   <!-- Humdrum panel -->
   <label class="small" style="margin-top:8px;display:block">Displayed humdrum / .krn (absolute original shown below):</label>
   <div id="humPanel" class="card" style="margin-top:8px;white-space:pre-wrap;font-family:monospace">(no file loaded)</div>
@@ -641,6 +639,21 @@ const octPlus = document.getElementById('octPlus');
   });
 })();
 
+// -------------------- Filter state (internal) --------------------
+const selected = { dir: new Set(), mode: new Set(), diff: new Set() };
+
+// -------------------- Catalog / state (MOVED BEFORE INITIALIZERS) --------------------
+let catalog = []; // <<<< IMPORTANT: declared early so initializers can reference safely
+let currentKrn = '';
+let currentEntry = null;
+let lastTargetTonic = '';
+let lastTargetMode = '';
+let lastOriginalKey = '';
+let lastOriginalMode = '';
+let lastRenderTranspose = ''; // what was sent to verovio transpose (tonic or numeric)
+let transposePreferFlats = false;
+let currentRenderSemitoneShift = 0;
+
 // --- DEFAULT SELECTED: Direction, Mode, Level buttons (visual only) ---
 (function initDefaultFilterSelections(){
   // Direction
@@ -657,8 +670,27 @@ const octPlus = document.getElementById('octPlus');
   document.querySelectorAll('#diffRow .btn').forEach(btn => {
     btn.classList.add('selected');
   });
-})();
 
+  // Initialize the internal selected sets to match the visual defaults:
+  // Dir
+  Array.from(document.querySelectorAll('#dirRow .btn')).forEach(b => {
+    const v = b.dataset.value;
+    if (v) selected.dir.add(v);
+  });
+  // Mode
+  Array.from(document.querySelectorAll('#modeRow .btn')).forEach(b => {
+    const v = b.dataset.value;
+    if (v) selected.mode.add(v);
+  });
+  // Diff
+  Array.from(document.querySelectorAll('#diffRow .btn')).forEach(b => {
+    const v = b.dataset.value;
+    if (v) selected.diff.add(v);
+  });
+
+  // Update counts initially
+  updateMatchCount();
+})();
 
 // -------------------- Utils --------------------
 function setStatus(txt, isErr){
@@ -681,7 +713,7 @@ function letterStepsUp(fromLetter, steps){ // steps >= 0
 function normalizeTonicForHumdrum(s) {
   if (!s) return s;
   const raw = String(s).trim();
-  const m = raw.match(/^([A-Ga-g])([#\u266f]|##|b|bb|\u266d|--|-)?$/);
+  const m = raw.match(/^([A-Ga-g])([#\u266f-]{0,2})?$/);
   if (!m) return raw;
   const letter = m[1];
   let acc = m[2] || '';
@@ -1320,7 +1352,7 @@ function transformFiguresForTonicWithTrace(originalKrn, targetTonic, targetMode)
   return outLines.join('\n');
 }
 
-// -------------------- Catalog / filters / UI --------------------
+// -------------------- Catalog / filters / UI helpers --------------------
 function capitalize(s){ return String(s || '').replace(/^\w/, c => c.toUpperCase()); }
 function updatePillsFromCatalogEntry(entry){
   function uc(s){ return String(s||'').replace(/^\w/, c => c.toUpperCase()); }
@@ -1350,17 +1382,6 @@ function updateKeyPill(tonic, mode){
   if (!tonic) document.getElementById('keyPill').style.display = 'none';
   else document.getElementById('keyPill').style.display = '';
 }
-
-let catalog = [];
-let currentKrn = '';
-let currentEntry = null;
-let lastTargetTonic = '';
-let lastTargetMode = '';
-let lastOriginalKey = '';
-let lastOriginalMode = '';
-let lastRenderTranspose = ''; // what was sent to verovio transpose (tonic or numeric)
-let transposePreferFlats = false;
-let currentRenderSemitoneShift = 0;
 
 // -------------------- Fetch helpers --------------------
 async function fetchList(){
@@ -1451,14 +1472,12 @@ function matchesFilters(item){
   return true;
 }
 
-const selected = { dir: new Set(), mode: new Set(), diff: new Set() };
-
 function currentMatches(){ return catalog.filter(matchesFilters); }
 function updateMatchCount(){
   if (matchCount) matchCount.textContent = String(currentMatches().length);
 }
 
-// -------------------- Key button helpers (fixed) --------------------
+// -------------------- Key button helpers --------------------
 function refreshKeyButtonsUI(){
   keyButtons.forEach(btn => {
     const c = Number(btn.dataset.count);
@@ -1763,6 +1782,55 @@ accRadios.forEach(r => {
     }
   });
 });
+
+// -------------------- Filter button wiring --------------------
+// Utility to toggle a value in a Set and update UI/counts
+function toggleFilterValue(filterName, value, btnEl) {
+  const set = selected[filterName];
+  if (!set) return;
+  if (set.has(value)) {
+    set.delete(value);
+    btnEl.classList.remove('selected');
+  } else {
+    set.add(value);
+    btnEl.classList.add('selected');
+  }
+  updateMatchCount();
+}
+
+// Attach listeners to Dir / Mode / Diff buttons
+Array.from(document.querySelectorAll('#dirRow .btn')).forEach(btn => {
+  btn.addEventListener('click', () => {
+    const v = btn.dataset.value;
+    if (!v) return;
+    toggleFilterValue('dir', v, btn);
+  });
+});
+Array.from(document.querySelectorAll('#modeRow .btn')).forEach(btn => {
+  btn.addEventListener('click', () => {
+    const v = btn.dataset.value;
+    if (!v) return;
+    toggleFilterValue('mode', v, btn);
+  });
+});
+Array.from(document.querySelectorAll('#diffRow .btn')).forEach(btn => {
+  btn.addEventListener('click', () => {
+    const v = btn.dataset.value;
+    if (!v) return;
+    toggleFilterValue('diff', v, btn);
+  });
+});
+
+// Clear filters button: clear internal sets and visual selected classes
+if (clearBtn) {
+  clearBtn.addEventListener('click', () => {
+    selected.dir.clear();
+    selected.mode.clear();
+    selected.diff.clear();
+    document.querySelectorAll('#dirRow .btn, #modeRow .btn, #diffRow .btn').forEach(b => b.classList.remove('selected'));
+    updateMatchCount();
+  });
+}
 
 // -------------------- Sample / Random wiring --------------------
 randomBtn.addEventListener('click', async () => {
