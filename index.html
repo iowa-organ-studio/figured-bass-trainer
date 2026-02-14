@@ -1,9 +1,10 @@
+
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Boyvin Figured Bass Exercises</title>
+<title>CPE Bach Rule of the Octave Randomizer</title>
 <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js"></script>
 <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-hum.js"></script>
 <style>
@@ -88,7 +89,9 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .slider{ display:none !important; }
 
 /* ======= Row 4: Filters (no big outer card) ======= */
-/* Hide labels that used to exist for dir/mode (removed in markup) */
+/* Hide labels “Dir:”, “Mode:”, “Lvl:” per request */
+.group[data-role="dir"] .small,
+.group[data-role="mode"] .small,
 .group[data-role="level"] .small{ display:none }
 
 /* Accidentals radios styled to look like chips, mutually exclusive by native radio */
@@ -102,15 +105,6 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .radio-inline label.selected{
   background:var(--butter);border-color:var(--gold);color:var(--gold-ink)
 }
-
-/* Level buttons (12) */
-.level-grid{ display:flex; gap:6px; flex-wrap:wrap; max-width:520px; }
-.level-btn{
-  padding:6px 8px;border-radius:8px;border:1px solid var(--border);
-  background:#fff;color:var(--ink);cursor:pointer;font-size:.82rem;font-weight:600;
-  min-width:34px; text-align:center;
-}
-.level-btn.toggled, .level-btn.selected{ background:var(--butter); border-color:var(--gold); color:var(--gold-ink) }
 
 /* ======= Include spelled-tonics grid (replaces previous pc-grid) ======= */
 .include-grid{display:flex;flex-wrap:wrap;gap:6px;max-width:720px}
@@ -131,25 +125,6 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .humdrum-toggle:hover{ background:#fdfdfd }
 .humdrum-chevron{ font-weight:800;color:#555 }
 .humdrum-original-label{ display:none !important }
-
-/* Boyvin signature badge: narrow horizontal image placed to the right of #keyPill */
-.boyvin-signature {
-  display: inline-block;
-  margin-left: 10px;              /* space from key pill */
-  vertical-align: middle;
-  line-height: 0;                 /* remove inline-gap */
-}
-.boyvin-signature img {
-  display: block;
-  max-height: 40px;               /* tune this to taste (px) */
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  pointer-events: none;
-  user-select: none;
-  opacity: 0.98;
-}
-
 
 /* ======= Logo ======= */
 #logoAfterFilters img {
@@ -245,25 +220,34 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     </div>
   </div>
 
-  <!-- ===== Row 4: Filters (NO big outer card) ======= -->
+  <!-- ===== Row 4: Filters (NO big outer card) ===== -->
   <div class="line" id="row4">
-    <!-- Left area: Level (12) -->
-    <div class="group" data-role="level" style="flex-direction:column;align-items:flex-start">
+    <div class="group" data-role="dir">
+      <div class="small">Dir:</div>
+      <div id="dirRow" style="display:flex;gap:6px">
+        <button class="btn" data-filter="dir" data-value="ascending">Ascending</button>
+        <button class="btn" data-filter="dir" data-value="descending">Descending</button>
+      </div>
+    </div>
+
+    <div class="group" data-role="mode">
+      <div class="small">Mode:</div>
+      <div id="modeRow" style="display:flex;gap:6px">
+        <button class="btn" data-filter="mode" data-value="major">Major</button>
+        <button class="btn" data-filter="mode" data-value="minor">Minor</button>
+      </div>
+    </div>
+
+    <div class="group" data-role="level">
       <div class="small">Lvl:</div>
-      <div id="diffRow" class="level-grid">
-        <!-- 12 level buttons -->
-        <button class="level-btn btn selected" data-filter="diff" data-value="1">1</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="2">2</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="3">3</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="4">4</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="5">5</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="6">6</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="7">7</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="8">8</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="9">9</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="10">10</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="11">11</button>
-        <button class="level-btn btn selected" data-filter="diff" data-value="12">12</button>
+      <div id="diffRow" style="display:flex;gap:6px">
+        <button class="btn" data-filter="diff" data-value="1">1</button>
+        <button class="btn" data-filter="diff" data-value="2">2</button>
+        <button class="btn" data-filter="diff" data-value="3">3</button>
+        <button class="btn" data-filter="diff" data-value="4">4</button>
+        <button class="btn" data-filter="diff" data-value="5">5</button>
+        <button class="btn" data-filter="diff" data-value="6">6</button>
+        <button class="btn" data-filter="diff" data-value="7">7</button>
       </div>
     </div>
 
@@ -275,14 +259,9 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
       </div>
     </div>
 
-    <!-- Clear filters and Only Complete on same horizontal row (clear -> checkbox) -->
-    <div class="group" data-role="clear-and-complete" style="display:flex;align-items:center;gap:12px">
-      <div style="display:flex;gap:8px;align-items:center">
-        <button id="clearFilters" class="btn">Clear filters</button>
-      </div>
-      <label class="small" style="display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="onlyCompleteCheckbox" /> Only Complete Exercises
-      </label>
+    <div class="group" data-role="matching">
+      <div class="small">Matching: <span id="matchCount">0</span> / <span id="totalCount">0</span></div>
+      <button id="clearFilters" class="btn">Clear filters</button>
     </div>
 
     <div class="spacer"></div>
@@ -327,14 +306,11 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
 <script>
 /* ========================================================================== 
-   App adapted per user request (fixed rendering clamp + checkbox placement).
-   - Removed DIR and MODE buttons.
-   - Level buttons expanded to 12.
-   - Removed Matching status display.
-   - Added "Only Complete Exercises" checkbox (default unchecked).
-   - Only Complete & Clear filters are on same row (clear -> checkbox).
-   - Safety: clamp scale and spacing values before calling Verovio to avoid
-     divide-by-zero errors ("Render failed: divide by 0").
+   Full app (complete). Changes:
+   - "tonics" removed.
+   - Include grid (spelled-tonics) implemented in the Include area.
+   - Include all/none buttons wired; default = all lit.
+   - Historic/Modern radio labels show selected state.
    ========================================================================== */
 
 (async function () {
@@ -351,7 +327,11 @@ const svgHost = document.getElementById('svg');
 const humPanel = document.getElementById('humPanel');
 const status = document.getElementById('status');
 
+const dirRow = document.getElementById('dirRow');
+const modeRow = document.getElementById('modeRow');
 const diffRow = document.getElementById('diffRow');
+const matchCount = document.getElementById('matchCount');
+const totalCount = document.getElementById('totalCount');
 
 const randomBtn = document.getElementById('randomFiltered');
 const clearBtn = document.getElementById('clearFilters');
@@ -366,6 +346,7 @@ const downloadTraceBtn = document.getElementById('downloadTrace');
 
 const modeTagline = document.getElementById('modeTagline');
 const historicalStatus = document.getElementById('historicalStatus');
+
 
 // Accidentals (Historic/Modern)
 const accRadios = Array.from(document.querySelectorAll('input[name="accMode"]'));
@@ -382,9 +363,6 @@ const includeGridEl = document.getElementById('includeGrid');
 const includeSelectAllBtn = document.getElementById('includeSelectAll');
 const includeSelectNoneBtn = document.getElementById('includeSelectNone');
 let allowedTonicBases = new Set(); // elements like "F#", "B-", "C" where flats use '-' glyph
-
-// Only Complete checkbox
-const onlyCompleteCheckbox = document.getElementById('onlyCompleteCheckbox');
 
 // Scale / Spacing (UI-only)
 const scaleSlider = document.getElementById('scaleSlider');
@@ -404,17 +382,18 @@ const tpPlus = document.getElementById('tpPlus');
 const tpToggle= document.getElementById('tpToggle');
 const octMinus= document.getElementById('octMinus');
 const octPlus = document.getElementById('octPlus');
-
 // --- HUMDRUM: default collapsed with chevron toggle (visual-only) ---
 (function initHumdrumCollapsed() {
   const humPanelEl = document.getElementById('humPanel');
   if (!humPanelEl) return;
 
+  // Hide the original label (keep in DOM)
   const humLabel = Array.from(document.querySelectorAll('label.small')).find(l =>
     /displayed humdrum|humdrum/i.test((l.textContent || '').trim())
   );
   if (humLabel) humLabel.classList.add('humdrum-original-label');
 
+  // Create the new toggle
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.className = 'humdrum-toggle';
@@ -431,6 +410,7 @@ const octPlus = document.getElementById('octPlus');
   toggle.appendChild(chev);
   toggle.appendChild(txt);
 
+  // Insert above the panel and start collapsed
   humPanelEl.parentNode.insertBefore(toggle, humPanelEl);
   humPanelEl.style.display = 'none';
 
@@ -451,26 +431,46 @@ const octPlus = document.getElementById('octPlus');
 })();
 
 // -------------------- Filter state (internal) --------------------
-// Now only 'diff' (levels) is a filter set. Dir and mode removed.
-const selected = { diff: new Set() };
+const selected = { dir: new Set(), mode: new Set(), diff: new Set() };
 
 // make sure catalog exists before any UI code calls currentMatches()
 let catalog = [];
 
-// --- DEFAULT SELECTED: Level 1–12
+// --- DEFAULT SELECTED: Direction, Mode, Level buttons (visual only) ---
 (function initDefaultFilterSelections(){
-  // Level 1–12 buttons visually selected by default (markup already includes selected class)
+  // Direction
+  document.querySelectorAll('#dirRow .btn').forEach(btn => {
+    btn.classList.add('selected');
+  });
+
+  // Mode
+  document.querySelectorAll('#modeRow .btn').forEach(btn => {
+    btn.classList.add('selected');
+  });
+
+  // Level 1–7
   document.querySelectorAll('#diffRow .btn').forEach(btn => {
     btn.classList.add('selected');
   });
 
-  // Initialize the internal selected set to match the visual defaults:
+  // Initialize the internal selected sets to match the visual defaults:
+  // Dir
+  Array.from(document.querySelectorAll('#dirRow .btn')).forEach(b => {
+    const v = b.dataset.value;
+    if (v) selected.dir.add(v);
+  });
+  // Mode
+  Array.from(document.querySelectorAll('#modeRow .btn')).forEach(b => {
+    const v = b.dataset.value;
+    if (v) selected.mode.add(v);
+  });
+  // Diff
   Array.from(document.querySelectorAll('#diffRow .btn')).forEach(b => {
     const v = b.dataset.value;
     if (v) selected.diff.add(v);
   });
 
-  // Update counts initially (function does nothing to DOM now, but preserves logic)
+  // Update counts initially
   updateMatchCount();
 })();
 
@@ -648,7 +648,7 @@ function diatonicSpelling(tonicStr, mode, bassSpelled, numeral){
 
 // Verovio toolkit
 let vrv;
-const baseOptions = { scale:50, pageWidth:1200, adjustPageHeight:true, spacingLinear:0.32, spacingNonLinear:0.46 };
+const baseOptions = { scale:50, pageWidth:900, adjustPageHeight:true, spacingLinear:0.32, spacingNonLinear:0.46 };
 
 // -------------------- Verovio init --------------------
 async function waitForVerovioGlobal(timeout = 10000) {
@@ -1138,34 +1138,20 @@ function transformFiguresForTonicWithTrace(originalKrn, targetTonic, targetMode)
 
 // -------------------- Catalog / filters / UI --------------------
 function capitalize(s){ return String(s || '').replace(/^\w/, c => c.toUpperCase()); }
-// -------------------- Replace this function in your script --------------------
 function updatePillsFromCatalogEntry(entry){
-  // If no entry, reset to default
-  if (!entry) {
-    titlePill.innerHTML = 'No title <small id="titleSub"></small>';
-    return;
-  }
-
-  // Prefer full raw title if present, otherwise fallback to "Rule of the Octave" + diff
-  const title = (entry.title && String(entry.title).trim()) ? String(entry.title).trim() : '';
-  const rawNumber = (entry.rawNumber && String(entry.rawNumber).trim()) ? String(entry.rawNumber).trim() : '';
-
-  // Build display: prefer "title rawNumber" if either exists; otherwise fallback
-  let display = '';
-  if (title && rawNumber) display = `${title} ${rawNumber}`;
-  else if (title) display = title;
-  else if (rawNumber) display = rawNumber;
-  else {
-    // Original fallback behavior: keep an intelligible label
-    const lvl = entry?.diff != null ? String(entry.diff) : '';
-    const core = 'Rule of the Octave';
-    display = lvl ? `${core} ${lvl}` : core;
-  }
-
-  // Put the combined text into the pill; keep a small sub-slot empty for future use
-  titlePill.innerHTML = escapeHtml(display) + ' <small id="titleSub"></small>';
+  function uc(s){ return String(s||'').replace(/^\w/, c => c.toUpperCase()); }
+  const dirWord = entry?.dir ? uc(entry.dir) : '';
+  const modeWord = entry?.mode ? uc(entry.mode) : '';
+  const lvl = entry?.diff != null ? String(entry.diff) : '';
+  const leftParts = [dirWord, modeWord].filter(Boolean).join(' ').trim();
+  const core = 'Rule of the Octave';
+  let pieces = [];
+  if (leftParts) pieces.push(leftParts);
+  pieces.push(core);
+  if (lvl) pieces.push(lvl);
+  const finalText = pieces.join(' ');
+  titlePill.innerHTML = escapeHtml(finalText || 'No title');
 }
-
 function formatKeyName(tonic, mode){
   if (!tonic) return 'original';
   const m = String(tonic).trim().match(/^([A-Ga-g])(.+)?$/);
@@ -1210,12 +1196,9 @@ async function fetchText(path){
   const t = await r.text();
   return { path: p, text: t };
 }
-
-// metaFromHeader: now captures rawNumber string (full token after "!! Number")
-// 'diff' is the numeric first digit if present (used for level)
 function metaFromHeader(krn){
   const lines = krn.split(/\r?\n/).slice(0, 120);
-  let dir = null, diff = null, title = null, mode = null, rawNumber = null;
+  let dir = null, diff = null, title = null, mode = null;
   for (const ln of lines){
     const s = (ln||'').trim();
     if (!s || !s.startsWith('!!')) continue;
@@ -1224,12 +1207,9 @@ function metaFromHeader(krn){
       title = titleMatch[1].trim();
       continue;
     }
-    const numMatch = s.match(/^!!\s*Number\s+(.+)$/i);
+    const numMatch = s.match(/^!!\s*Number\s+(\d+)\s*$/i);
     if (numMatch && numMatch[1]){
-      rawNumber = numMatch[1].trim();
-      // diff is first digit found (if any)
-      const firstDigit = rawNumber.match(/\d/);
-      if (firstDigit) diff = parseInt(firstDigit[0], 10);
+      diff = parseInt(numMatch[1], 10);
       continue;
     }
     const dirLine = s.match(/^!!\s*Dir\b(.*)$/i);
@@ -1246,9 +1226,8 @@ function metaFromHeader(krn){
     const m = krn.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m);
     if (m) mode = (m[1] === m[1].toUpperCase()) ? 'major' : 'minor';
   }
-  return { dir, mode, diff, title, rawNumber };
+  return { dir, mode, diff, title };
 }
-
 async function buildCatalog(paths, concurrency=4){
   catalog = [];
   let i = 0;
@@ -1261,37 +1240,35 @@ async function buildCatalog(paths, concurrency=4){
       try {
         const { path, text } = await fetchText(raw);
         const meta = metaFromHeader(text);
-        results.push({ path, dir: meta.dir, mode: meta.mode, diff: meta.diff, title: meta.title, rawNumber: meta.rawNumber, text });
+        results.push({ path, dir: meta.dir, mode: meta.mode, diff: meta.diff, title: meta.title, text });
       } catch(e){ /* skip */ }
     }
   }
   await Promise.all(Array.from({length:concurrency}, worker));
   catalog = results;
+  if (totalCount) totalCount.textContent = String(catalog.length);
   updateMatchCount();
 }
 
 function pickRandom(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
 
-// matchesFilters now checks selected.diff and onlyComplete checkbox
 function matchesFilters(item){
-  // Level filter
+  if (selected.dir.size){
+    if (!item.dir || !selected.dir.has(item.dir)) return false;
+  }
+  if (selected.mode.size){
+    if (!item.mode || !selected.mode.has(item.mode)) return false;
+  }
   if (selected.diff.size){
     const d = String(item.diff ?? '');
     if (!selected.diff.has(d)) return false;
-  }
-  // Only Complete Exercises checkbox: require rawNumber to be purely digits
-  if (onlyCompleteCheckbox && onlyCompleteCheckbox.checked) {
-    const rn = String(item.rawNumber || '');
-    if (!/^\d+$/.test(rn)) return false;
   }
   return true;
 }
 
 function currentMatches(){ return catalog.filter(matchesFilters); }
-// updateMatchCount intentionally does not modify any removed DOM matching elements.
-// It is kept to preserve call-sites without causing errors.
 function updateMatchCount(){
-  // no-op for UI (matching display removed per request)
+  if (matchCount) matchCount.textContent = String(currentMatches().length);
 }
 
 // -------------------- Key button helpers (fixed) --------------------
@@ -1460,7 +1437,6 @@ function getEffectiveAllowedTonicsForMode(mode){
 // -------------------- Rendering --------------------
 function getCurrentScaleSpacing(){
   const scale = (scaleSlider && scaleSlider.value) ? Number(scaleSlider.value) : baseOptions.scale;
-  // compute spacingLinear from slider (value/100). If missing, use baseOptions.
   const spacingLinear = (spacingSlider && spacingSlider.value) ? Number(spacingSlider.value)/100 : baseOptions.spacingLinear;
   return { scale, spacingLinear };
 }
@@ -1475,31 +1451,17 @@ function tonicToVerovioAscii(tonic) {
 function renderWithVerovio(krnText, tonicForRender){
   try {
     const { scale, spacingLinear } = getCurrentScaleSpacing();
-
-    // Determine a safe container width for pageWidth.
-    // svgHost.clientWidth may be 0 if the element is not yet laid out.
-    // Use a conservative fallback and enforce Verovio's minimum (100).
-    let containerWidth = 0;
-    try { containerWidth = Math.round(svgHost.clientWidth || 0); } catch(e){ containerWidth = 0; }
-    if (!containerWidth || containerWidth < 100) {
-      // Use a reasonable fallback that won't trigger Verovio bounds error.
-      // 900 is what you used previously; 1200 is also safe. Choose 900 to keep similar layout.
-      containerWidth = 900;
+    // If currentRenderSemitoneShift is non-zero, prefer numeric transpose string; otherwise send spelled tonic.
+    let verovioTonic = '';
+    if (currentRenderSemitoneShift && !isNaN(Number(currentRenderSemitoneShift))) {
+      verovioTonic = String(Number(currentRenderSemitoneShift));
+      lastRenderTranspose = verovioTonic;
+    } else {
+      verovioTonic = tonicForRender ? tonicToVerovioAscii(String(tonicForRender)) : '';
+      lastRenderTranspose = verovioTonic || '';
     }
-    // Now apply options ensuring pageWidth is within allowed range.
-    const verovioOptions = {
-      ...baseOptions,
-      pageWidth: containerWidth,
-      scale: Number(scale),
-      spacingLinear: Number(spacingLinear),
-      transpose: (currentRenderSemitoneShift && !isNaN(Number(currentRenderSemitoneShift))) ? String(Number(currentRenderSemitoneShift)) : (tonicForRender ? tonicToVerovioAscii(String(tonicForRender)) : '')
-    };
-
-    // Track what we're sending to verovio (useful for trace/debug)
-    lastRenderTranspose = verovioOptions.transpose || '';
-
     if (vrv) {
-      vrv.setOptions(verovioOptions);
+      vrv.setOptions({ ...baseOptions, scale: Number(scale), spacingLinear: Number(spacingLinear), transpose: verovioTonic });
       const svg = vrv.renderData(krnText || '', {});
       svgHost.innerHTML = svg;
     } else {
@@ -1510,7 +1472,6 @@ function renderWithVerovio(krnText, tonicForRender){
     traceLog('renderWithVerovio error: ' + (e?.message || e));
   }
 }
-
 
 // -------------------- Pipeline --------------------
 function runPipelineForEntry(entry, tonic, m){
@@ -1584,10 +1545,17 @@ const sample = `**kern\t**fb\t**text\t**text
 *k[]\t*k[]\t*k[]\t*k:
 *a:\t*a:\t*a:\t*a:
 =1\t=1\t.\t.
-4D\t.\t.\t.
-4d[\t.\t.\t.
-4d]\t2\t.\t.
-4c#\t.\t.\t.
+4AA\t5\t.\t.
+4BB\t7\t.\t.
+4C\t6\t.\t.
+4D\t9\t.\t.
+.\t8\t.\t.
+4E\t6 4\t.\t.
+.\t5 #\t.\t.
+4F#\t6\t.\t.
+4G#\t6 5\t.\t.
+4A\t.\t.\t.
+=|\t=|\t.\t.
 *-\t*-\t*-\t*-`;
 
 // -------------------- Enharmonic toggle sets --------------------
@@ -1742,7 +1710,7 @@ accRadios.forEach(r => {
 });
 updateAccLabelVisuals(); // initialize visual
 
-// -------------------- Filter button wiring --------------------
+// -------------------- Filter button wiring (FIX) --------------------
 // Utility to toggle a value in a Set and update UI/counts
 function toggleFilterValue(filterName, value, btnEl) {
   const set = selected[filterName];
@@ -1757,7 +1725,21 @@ function toggleFilterValue(filterName, value, btnEl) {
   updateMatchCount();
 }
 
-// Attach listeners to Diff (level) buttons
+// Attach listeners to Dir / Mode / Diff buttons
+Array.from(document.querySelectorAll('#dirRow .btn')).forEach(btn => {
+  btn.addEventListener('click', () => {
+    const v = btn.dataset.value;
+    if (!v) return;
+    toggleFilterValue('dir', v, btn);
+  });
+});
+Array.from(document.querySelectorAll('#modeRow .btn')).forEach(btn => {
+  btn.addEventListener('click', () => {
+    const v = btn.dataset.value;
+    if (!v) return;
+    toggleFilterValue('mode', v, btn);
+  });
+});
 Array.from(document.querySelectorAll('#diffRow .btn')).forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.value;
@@ -1766,18 +1748,13 @@ Array.from(document.querySelectorAll('#diffRow .btn')).forEach(btn => {
   });
 });
 
-// Clear filters button: clear internal diff set and visual selected classes
+// Clear filters button: clear internal sets and visual selected classes
 if (clearBtn) {
   clearBtn.addEventListener('click', () => {
+    selected.dir.clear();
+    selected.mode.clear();
     selected.diff.clear();
-    document.querySelectorAll('#diffRow .btn').forEach(b => b.classList.remove('selected'));
-    updateMatchCount();
-  });
-}
-
-// Wire Only Complete checkbox change to update counts (UI)
-if (onlyCompleteCheckbox){
-  onlyCompleteCheckbox.addEventListener('change', () => {
+    document.querySelectorAll('#dirRow .btn, #modeRow .btn, #diffRow .btn').forEach(b => b.classList.remove('selected'));
     updateMatchCount();
   });
 }
@@ -1874,42 +1851,6 @@ if (!currentKrn) {
   renderWithVerovio(sample, '');
   setStatus('ready — toggle TRACE and click "New Bass Line"');
 }
-
-// Drop-in: insert Boyvin signature immediately to the right of the key pill
-(function insertBoyvinSignature() {
-  const keyPill = document.getElementById('keyPill');
-  if (!keyPill) return;
-
-  // Create wrapper
-  const wrap = document.createElement('div');
-  wrap.id = 'boyvinSig';
-  wrap.className = 'boyvin-signature';
-  // Use root path file name as requested
-  const img = document.createElement('img');
-  img.src = 'boyvinsignature.png';
-  img.alt = "Boyvin signature";
-  wrap.appendChild(img);
-
-  // Insert after keyPill inside title-badges (so it's to the right)
-  keyPill.parentNode.insertBefore(wrap, keyPill.nextSibling);
-
-  // Keep visibility in sync with keyPill (if key pill is hidden, hide signature)
-  function syncVisibility() {
-    // If keyPill is display:none or not visible, hide signature
-    const kpStyle = window.getComputedStyle(keyPill);
-    if (kpStyle && kpStyle.display === 'none') wrap.style.display = 'none';
-    else wrap.style.display = 'inline-block';
-  }
-  syncVisibility();
-
-  // Observe style/class changes on keyPill and re-sync
-  const mo = new MutationObserver(syncVisibility);
-  mo.observe(keyPill, { attributes: true, attributeFilter: ['style', 'class'] });
-
-  // And also sync on window resize (in case layout toggles change visibility)
-  window.addEventListener('resize', syncVisibility);
-})();
-
 
 })();
 </script>
