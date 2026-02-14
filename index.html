@@ -27,343 +27,105 @@ body{
 .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px}
 header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
-/* ======= CONSTRAIN TOP ROW WIDTH (no full-page stretch) ======= */
-.controls-row{
-  display:grid;
-  grid-template-columns: 0.55fr 0.75fr 0.55fr;
-  gap:8px;
-  align-items:start;
-  max-width:980px;
-  margin:0;
-  justify-content:start;
-}
-@media (max-width:1000px){
-  .controls-row{
-    grid-template-columns:1fr;
-    max-width:100%;
-    margin:0
-  }
-}
-
 .small{font-size:.9rem;color:var(--muted)}
 .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .spacer{flex:1}
 
-/* ======= Title pills (single combined badge allowed) ======= */
-.title-badges{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  flex-wrap:wrap;
-}
+/* ======= Title pills ======= */
+.title-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .title-pill{
-  padding:6px 10px;
-  border-radius:10px;
-  background:#fff;
-  border:1px solid var(--border);
-  font-size:.92rem;
-  font-weight:600;
-  white-space:nowrap;
+  padding:6px 10px;border-radius:10px;background:#fff;border:1px solid var(--border);
+  font-size:.92rem;font-weight:600;white-space:nowrap
 }
-#keyPill{ display:inline-block; } /* show secondary pill */
+#keyPill{ display:inline-block; }
 .title-pill small{ color:var(--muted); font-weight:500; margin-left:6px}
 
-/* ======= Key range — much smaller buttons & correct glyphs ======= */
-.key-card{
-  font-size:.78rem;
-  padding:8px
+/* ======= Buttons ======= */
+.btn{
+  padding:4px 8px;border-radius:999px;border:1px solid var(--grey);
+  background:var(--grey);color:#222;cursor:pointer;font-size:.82rem;line-height:1
 }
-.key-card h3{
-  margin:0 0 6px 0;
-  font-weight:700;
-  font-size:.9rem;
-}
-.key-grid{
-  display:grid;
-  grid-template-columns:repeat(4, auto);
-  gap:4px 6px;
-}
-.key-btn{
-  background:var(--grey);
-  border:1px solid var(--border);
-  color:#222;
-  padding:2px 6px;
-  border-radius:10px;
-  font-weight:400;
-  cursor:pointer;
-  min-width:36px;
-  box-shadow:0 1px 0 rgba(0,0,0,0.05) inset;
-  font-size:.72rem;
-  line-height:1.0;
-}
-.key-btn.selected{
-  background:var(--butter);
-  border-color:var(--gold);
-  color:var(--gold-ink);
-}
-.select-actions{display:flex;gap:6px;margin-top:6px}
-.select-actions .btn{
-  padding:4px 8px;
-  border-radius:8px;
-  background:#fff;
-  border:1px solid var(--border);
-  cursor:pointer;
-  font-size:.78rem;
-}
+.btn.selected{background:var(--butter);border-color:var(--gold);color:var(--gold-ink)}
 
-/* ======= Scale/Spacing — tight controls, small slider width ======= */
-.mid-card{
-  font-size:.88rem;
-  padding:8px
-}
-.control-row{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  flex-wrap:wrap;
-}
-.small-pill{
-  background:#fff;
-  border:1px solid var(--border);
-  padding:4px 7px;
-  border-radius:8px;
-  font-weight:600;
-  font-size:.82rem;
-}
-.btn{padding:4px 8px;border-radius:999px;border:1px solid var(--grey);background:var(--grey);color:#222;cursor:pointer;font-size:.82rem}
-.btn.selected{background:var(--butter);border-color:var(--gold)}
-.slider{
-  width:220px;
-  height:8px;
-  background:linear-gradient(90deg,#f0c84e,#d9d9d9);
-  border-radius:8px;
-  position:relative;
-}
-.slider input[type=range]{
-  width:220px;
-  margin:0;
-  -webkit-appearance:none;
-  background:transparent;
-  position:relative;
-  top:-3px;
-}
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;
-  width:14px;
-  height:14px;
-  border-radius:50%;
-  background:#fff;
-  border:2px solid #ccc;
-  box-shadow:0 1px 2px rgba(0,0,0,0.2);
-  cursor:pointer;
-}
+/* Make the select all/none buttons black (not grey) */
+#selectAllKeys, #selectNoneKeys, #includeSelectAll, #includeSelectNone { color: var(--ink); background: #fff; border-color: var(--border); font-weight:600; }
 
-/* ======= Right (Transpose/Octave) ======= */
-.right-card{
-  font-size:.88rem;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  padding:8px
+/* ======= Chips container line ======= */
+.line{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px
 }
-.transpose-block{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  flex-wrap:nowrap;
+.group{
+  display:flex;align-items:center;gap:8px;
+  background:#fff;border:1px solid var(--border);border-radius:10px;padding:6px 8px
 }
-.tp-btn{
-  padding:4px 8px;
-  border-radius:999px;
-  border:1px solid #f0d59a;
-  background:#fff;
-  cursor:pointer;
-  font-size:.86rem;
-}
-#tpToggle{
-  padding:6px 12px;
-  border-radius:999px;
-  background:var(--accent-green);
-  color:#fff;
-  border:1px solid rgba(0,0,0,0.05);
-  font-weight:700;
-  box-shadow:0 2px 0 rgba(0,0,0,0.08);
-  margin-left:2px;
-  white-space:nowrap;
-}
+.group .small{font-size:.82rem;font-weight:700;color:#333}
 
-/* ======= Filters bar ======= */
-.filters-card{ margin-top:10px; }
-.filters-line{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  flex-wrap:wrap;
-}
-.filters-line .group{
-  display:flex;
-  align-items:center;
-  gap:6px;
-}
-.chip-row{display:flex;gap:6px;flex-wrap:wrap}
-.radio-inline{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-.radio-inline label{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  cursor:pointer;
-}
-
-/* Viewer */
-#viewer{ margin-top:10px; }
-
+/* ======= Row 1 ======= */
 .new-bass-btn{
-  padding:8px 12px;border-radius:999px;border:1px solid #e6b800;background:var(--gold);color:var(--gold-ink);font-weight:600;cursor:pointer
+  padding:8px 12px;border-radius:999px;border:1px solid #e6b800;background:var(--gold);
+  color:var(--gold-ink);font-weight:600;cursor:pointer
 }
 
-/* humdrum panel monospace */
-#humPanel { font-size:0.9rem; line-height:1.25; }
+/* ======= Viewer ======= */
+#viewer{ margin-top:8px; }
 
-/* ===========================================================
-   UI MERGE PATCH — VISUAL ONLY (no functional changes)
-   =========================================================== */
-
-/* Controls row: prevent stretch of right card */
-.controls-row{
-  grid-template-columns: auto auto max-content;
-  align-items:stretch;
+/* ======= Row 3: Key Range + Scale + Spacing (no outer big card) ======= */
+.key-grid{
+  display:flex;flex-wrap:nowrap;gap:6px;
 }
-
-/* Key range: make buttons a bit taller to match Scale/Spacing height */
 .key-btn{
-  padding:6px 8px;      /* taller, same width */
-  min-height:28px;
-  font-size:.75rem;
-  font-weight:500;
+  background:var(--grey);border:1px solid var(--border);color:#222;
+  padding:6px 8px;border-radius:10px;font-weight:500;cursor:pointer;
+  min-width:36px;min-height:28px;box-shadow:0 1px 0 rgba(0,0,0,0.05) inset;
+  font-size:.75rem;line-height:1.0
 }
+.key-btn.selected{background:var(--butter);border-color:var(--gold);color:var(--gold-ink)}
+.small-pill{
+  background:#fff;border:1px solid var(--border);padding:4px 7px;border-radius:8px;
+  font-weight:600;font-size:.82rem;line-height:1
+}
+/* Hide the sliders visually (keep in DOM for existing JS) */
+.slider{ display:none !important; }
 
-/* Scale/Spacing: size to content (no right whitespace) */
-.mid-card{
-  width:max-content;
-  max-width:100%;
-}
+/* ======= Row 4: Filters (no big outer card) ======= */
+/* Hide labels “Dir:”, “Mode:”, “Lvl:” per request */
+.group[data-role="dir"] .small,
+.group[data-role="mode"] .small,
+.group[data-role="level"] .small{ display:none }
 
-/* Transpose/Octave: crop right side, size to content, bigger enharmonic toggle */
-.right-card{
-  width:max-content;
-  max-width:100%;
-  padding-right:4px;        /* crop right padding */
-}
-.transpose-block{
-  gap:6px;
-  min-height:42px;
-  justify-content:flex-start;
-}
-#tpToggle{
-  padding:10px 16px;        /* larger */
-  font-size:1rem;
-  align-self:center;
-  margin-right:0;
-}
-
-/* Filters: present each .group like a small card on a single horizontal strip */
-.filters-line{
-  gap:8px;
-}
-.filters-line .group{
-  background:#fff;
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:6px 8px;
-}
-.filters-line .group .chip-row{
-  display:flex;
-  gap:6px;
-  flex-wrap:wrap;
-}
-.filters-line .group .small{
-  font-size:.82rem;
-  font-weight:700;
-  color:#333;
-}
-
-/* Hide Dir: and Mode: labels for a cleaner look */
-.filters-line .group:nth-child(1) .small,
-.filters-line .group:nth-child(2) .small{
-  display:none;
-}
-
-/* Replace "Lvl:" label visually with "Level" (content unchanged) */
-.filters-line .group:nth-child(3) .small{
-  position:relative;
-  color:transparent;
-}
-.filters-line .group:nth-child(3) .small::before{
-  content:"Level";
-  position:absolute;
-  left:0;
-  color:#333;
-}
-
-/* Accidentals radios styled as toggle pills (behavior unchanged) */
-.radio-inline input[type="radio"]{
-  position:absolute;
-  opacity:0;
-  width:0;
-  height:0;
-}
+/* Accidentals radios styled to look like chips, mutually exclusive by native radio */
+.radio-inline{display:flex;align-items:center;gap:6px}
+.radio-inline input[type="radio"]{position:absolute;opacity:0;width:0;height:0}
 .radio-inline label{
-  background:var(--grey);
-  border:1px solid var(--border);
-  padding:4px 10px;
-  border-radius:10px;
-  font-weight:500;
-  font-size:.78rem;
-  color:#222;
+  padding:4px 8px;border-radius:999px;border:1px solid var(--grey);
+  background:var(--grey);color:#222;font-size:.82rem;line-height:1;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;
 }
-/* Chrome supports :has(); this highlights the active radio visually */
-.radio-inline label:has(input[type="radio"]:checked){
-  background:var(--butter);
-  border-color:var(--gold);
-  color:var(--gold-ink);
+.radio-inline label.selected{
+  background:var(--butter);border-color:var(--gold);color:var(--gold-ink)
 }
 
-/* Hide Historical=... text in tagline (visual only, logic unchanged) */
-#historicalStatus{ display:none; }
-
-humdrum-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #fff;
-  border: 1px solid var(--border);
-  color: #333;
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 0.92rem;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 8px;
+/* ======= Include spelled-tonics grid (replaces previous pc-grid) ======= */
+.include-grid{display:flex;flex-wrap:wrap;gap:6px;max-width:720px}
+.include-btn{
+  padding:6px 8px;border-radius:8px;border:1px solid var(--border);
+  background:#fff;color:var(--ink);cursor:pointer;font-size:.82rem;font-weight:600;
 }
+.include-btn.toggled{ background:var(--butter); border-color:var(--gold); color:var(--gold-ink) }
 
-.humdrum-toggle:hover {
-  background: #fdfdfd;
+/* ======= Transpose/Octave/Enharmonic — keep in DOM, hide visually ======= */
+.controls-row{ display:none !important; }
+
+/* ======= Humdrum collapse helper ======= */
+.humdrum-toggle {
+  display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--border);
+  color:#333;border-radius:10px;padding:6px 10px;font-size:.92rem;font-weight:600;cursor:pointer;margin-top:8px
 }
+.humdrum-toggle:hover{ background:#fdfdfd }
+.humdrum-chevron{ font-weight:800;color:#555 }
+.humdrum-original-label{ display:none !important }
 
-.humdrum-chevron {
-  font-weight: 800;
-  color: #555;
-}
-
-/* Keep original label in DOM but hide it visually (we insert a new toggle above the panel) */
-.humdrum-original-label {
-  display: none !important;
-}
-
+/* ======= Logo ======= */
 #logoAfterFilters img {
   max-width: 66%;
   height: auto;
@@ -371,14 +133,14 @@ humdrum-toggle {
   margin-left: auto;
   margin-right: auto;
 }
-
 </style>
 </head>
 <body>
+
 <div class="card">
-  <header style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <!-- ===== Row 1: New Bass Line, Title, Key ===== -->
+  <header>
     <button id="randomFiltered" class="new-bass-btn" type="button">New Bass Line</button>
-    <!-- Single combined title badge -->
     <div class="title-badges" id="titlePills" aria-hidden="false" style="margin-left:6px">
       <div class="title-pill" id="titlePill">No title <small id="titleSub"></small></div>
       <div class="title-pill" id="keyPill"><span id="keyPillValue">original</span></div>
@@ -386,11 +148,20 @@ humdrum-toggle {
     <div class="spacer"></div>
   </header>
 
-  <!-- Top controls row -->
-  <div class="controls-row" style="margin-top:8px">
-    <!-- Key range -->
-    <div class="card key-card">
-      <h3>Key range</h3>
+  <!-- ===== Row 2: Music viewer ===== -->
+  <div id="viewer" class="card" style="margin-top:8px">
+    <div id="svg">Waiting for Verovio…</div>
+    <div id="modeTagline" class="small" style="margin-top:8px">
+      Created for the University of Iowa Organ Studio
+      <span id="historicalStatus" style="margin-left:12px;color:var(--muted)">Historical=TRUE</span>
+    </div>
+  </div>
+
+  <!-- ===== Row 3: Key Range + Scale + Spacing (NO big card) ===== -->
+  <div class="line" id="row3">
+    <!-- Key Range -->
+    <div class="group" data-role="key-range">
+      <div class="small">Key Range</div>
       <div class="key-grid" id="keyGrid">
         <button class="key-btn" data-count="0">0♯/0♭</button>
         <button class="key-btn" data-count="1">1♯/1♭</button>
@@ -401,115 +172,119 @@ humdrum-toggle {
         <button class="key-btn" data-count="6">6♯/6♭</button>
         <button class="key-btn" data-count="7">7♯/7♭</button>
       </div>
-      <div class="select-actions">
-        <button id="selectAllKeys" class="btn">select all</button>
-        <button id="selectNoneKeys" class="btn">select none</button>
+      <div style="display:flex;gap:6px;margin-left:6px">
+        <button id="selectAllKeys" class="btn">all</button>
+        <button id="selectNoneKeys" class="btn">none</button>
       </div>
     </div>
 
-    <!-- Scale / Spacing -->
-    <div class="card mid-card">
-      <div style="font-weight:700; margin-bottom:4px">Scale</div>
-      <div class="control-row">
-        <button class="small-pill" id="scaleReset">reset</button>
-        <button class="btn" id="scaleMinus">−</button>
-        <button class="btn" id="scalePlus">+</button>
-        <div class="small-pill" id="scaleValue">50</div>
-      </div>
-      <div class="slider" aria-hidden="true" style="margin-top:4px">
-        <input id="scaleSlider" type="range" min="10" max="120" value="50">
-      </div>
-
-      <div style="height:6px"></div>
-
-      <div style="font-weight:700; margin-bottom:4px">Spacing</div>
-      <div class="control-row">
-        <button class="small-pill" id="spacingReset">reset</button>
-        <button class="btn" id="spacingMinus">−</button>
-        <button class="btn" id="spacingPlus">+</button>
-        <div class="small-pill" id="spacingValue">0.32</div>
-      </div>
-      <div class="slider" aria-hidden="true" style="margin-top:4px">
-        <input id="spacingSlider" type="range" min="10" max="80" value="32">
-      </div>
+    <!-- Scale -->
+    <div class="group" data-role="scale">
+      <div class="small">Scale</div>
+      <button class="small-pill" id="scaleReset">reset</button>
+      <button class="btn" id="scaleMinus">−</button>
+      <button class="btn" id="scalePlus">+</button>
+      <div class="small-pill" id="scaleValue">50</div>
+      <!-- Keep slider in DOM for JS; hidden with CSS -->
+      <div class="slider" aria-hidden="true"><input id="scaleSlider" type="range" min="10" max="120" value="50"></div>
     </div>
 
-    <!-- Transpose / Octave -->
-    <div class="card right-card">
+    <!-- Spacing -->
+    <div class="group" data-role="spacing">
+      <div class="small">Spacing</div>
+      <button class="small-pill" id="spacingReset">reset</button>
+      <button class="btn" id="spacingMinus">−</button>
+      <button class="btn" id="spacingPlus">+</button>
+      <div class="small-pill" id="spacingValue">0.32</div>
+      <!-- Keep slider in DOM for JS; hidden with CSS -->
+      <div class="slider" aria-hidden="true"><input id="spacingSlider" type="range" min="10" max="80" value="32"></div>
+    </div>
+  </div>
+
+  <!-- ===== (Hidden) Transpose/Octave UI kept for JS ======= -->
+  <div class="controls-row" style="margin-top:8px">
+    <div class="card">
       <div style="font-weight:700">Transpose</div>
-      <div class="transpose-block">
+      <div style="display:flex;gap:6px">
         <button class="tp-btn" id="tpMinus">−</button>
         <button class="tp-btn" id="tpPlus">+</button>
         <button class="tp-btn" id="tpToggle">♯/♭</button>
       </div>
       <div style="height:6px"></div>
       <div style="font-weight:700">Octave</div>
-      <div class="transpose-block">
+      <div style="display:flex;gap:6px">
         <button class="tp-btn" id="octMinus">−</button>
         <button class="tp-btn" id="octPlus">+</button>
       </div>
     </div>
   </div>
 
-  <!-- Viewer -->
-  <div id="viewer" class="card" style="margin-top:8px">
-    <div id="svg">Waiting for Verovio…</div>
-    <div id="modeTagline" class="small" style="margin-top:8px">
-      Created for the University of Iowa Organ Studio
-      <span id="historicalStatus" style="margin-left:12px;color:var(--muted)">Historical=TRUE</span>
+  <!-- ===== Row 4: Filters (NO big outer card) ===== -->
+  <div class="line" id="row4">
+    <div class="group" data-role="dir">
+      <div class="small">Dir:</div>
+      <div id="dirRow" style="display:flex;gap:6px">
+        <button class="btn" data-filter="dir" data-value="ascending">Ascending</button>
+        <button class="btn" data-filter="dir" data-value="descending">Descending</button>
+      </div>
+    </div>
+
+    <div class="group" data-role="mode">
+      <div class="small">Mode:</div>
+      <div id="modeRow" style="display:flex;gap:6px">
+        <button class="btn" data-filter="mode" data-value="major">Major</button>
+        <button class="btn" data-filter="mode" data-value="minor">Minor</button>
+      </div>
+    </div>
+
+    <div class="group" data-role="level">
+      <div class="small">Lvl:</div>
+      <div id="diffRow" style="display:flex;gap:6px">
+        <button class="btn" data-filter="diff" data-value="1">1</button>
+        <button class="btn" data-filter="diff" data-value="2">2</button>
+        <button class="btn" data-filter="diff" data-value="3">3</button>
+        <button class="btn" data-filter="diff" data-value="4">4</button>
+        <button class="btn" data-filter="diff" data-value="5">5</button>
+        <button class="btn" data-filter="diff" data-value="6">6</button>
+        <button class="btn" data-filter="diff" data-value="7">7</button>
+      </div>
+    </div>
+
+    <div class="group" data-role="accidentals">
+      <div class="small" style="min-width:88px">Accidentals:</div>
+      <div class="radio-inline" id="accRadioInline">
+        <label id="labelHistoric"><input type="radio" name="accMode" value="historic" checked> Historic</label>
+        <label id="labelModern"><input type="radio" name="accMode" value="modern"> Modern</label>
+      </div>
+    </div>
+
+    <div class="group" data-role="matching">
+      <div class="small">Matching: <span id="matchCount">0</span> / <span id="totalCount">0</span></div>
+      <button id="clearFilters" class="btn">Clear filters</button>
+    </div>
+
+    <div class="spacer"></div>
+  </div>
+
+  <!-- ===== Row 5: Include spelled-tonics (NO big outer card) ===== -->
+  <div class="line" id="row5">
+    <div class="group" data-role="include">
+      <div class="small" style="min-width:64px">Include</div>
+      <div style="display:flex;gap:6px">
+        <button id="includeSelectAll" class="btn" type="button">all</button>
+        <button id="includeSelectNone" class="btn" type="button">none</button>
+      </div>
+      <div class="include-grid" id="includeGrid" aria-label="Spelled tonics to include (select to restrict)"></div>
     </div>
   </div>
 
-  <!-- Filters -->
-  <div class="card filters-card">
-    <div class="filters-line">
-      <div class="group">
-        <div class="small" style="min-width:46px">Dir:</div>
-        <div class="chip-row" id="dirRow">
-          <button class="btn" data-filter="dir" data-value="ascending">Ascending</button>
-          <button class="btn" data-filter="dir" data-value="descending">Descending</button>
-        </div>
-      </div>
-      <div class="group">
-        <div class="small" style="min-width:52px">Mode:</div>
-        <div class="chip-row" id="modeRow">
-          <button class="btn" data-filter="mode" data-value="major">Major</button>
-          <button class="btn" data-filter="mode" data-value="minor">Minor</button>
-        </div>
-      </div>
-      <div class="group">
-        <div class="small" style="min-width:40px">Lvl:</div>
-        <div class="chip-row" id="diffRow">
-          <button class="btn" data-filter="diff" data-value="1">1</button>
-          <button class="btn" data-filter="diff" data-value="2">2</button>
-          <button class="btn" data-filter="diff" data-value="3">3</button>
-          <button class="btn" data-filter="diff" data-value="4">4</button>
-          <button class="btn" data-filter="diff" data-value="5">5</button>
-          <button class="btn" data-filter="diff" data-value="6">6</button>
-          <button class="btn" data-filter="diff" data-value="7">7</button>
-        </div>
-      </div>
-      <div class="group">
-        <div class="small" style="min-width:88px">Accidentals:</div>
-        <div class="radio-inline">
-          <label><input type="radio" name="accMode" value="historic" checked> Historic</label>
-          <label><input type="radio" name="accMode" value="modern"> Modern</label>
-        </div>
-      </div>
-      <div class="spacer"></div>
-      <div class="group">
-        <div class="small">Matching: <span id="matchCount">0</span> / <span id="totalCount">0</span></div>
-        <button id="clearFilters" class="btn">Clear filters</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Humdrum panel -->
+  <!-- ===== Humdrum panel ===== -->
   <label class="small" style="margin-top:8px;display:block">Displayed humdrum / .krn (absolute original shown below):</label>
   <div id="humPanel" class="card" style="margin-top:8px;white-space:pre-wrap;font-family:monospace">(no file loaded)</div>
 
-  <!-- Trace -->
-  <div class="card" style="margin-top:8px">
+  <!-- ===== Trace panel (kept for JS, hidden) ===== -->
+  <!-- To re-show, remove display:none on this container -->
+  <div class="card" style="margin-top:8px; display:none">
     <div class="row">
       <div class="small">Trace:</div>
       <label><input type="checkbox" id="traceToggle"> Trace ON</label>
@@ -518,17 +293,25 @@ humdrum-toggle {
       <div class="spacer"></div>
       <div class="small" id="status">Status: initializing…</div>
     </div>
-    <label class="small" style="margin-top:6px;display:block">Trace output (copy & paste here):</label>
+    <label class="small" style="margin-top:6px;display:block">Trace output (copy &amp; paste here):</label>
     <div id="tracePanel" class="card" style="margin-top:6px;white-space:pre-wrap;font-family:monospace">(trace disabled)</div>
   </div>
 </div>
 
-  <!-- Logo directly after filters -->
-  <div id="logoAfterFilters" aria-label="University of Iowa Organ Studio logo">
-    <img src="Organ-Studio-LockupStacked-RGB.svg" alt="University of Iowa School of Music">
-  </div>
+<!-- Logo directly after filters -->
+<div id="logoAfterFilters" aria-label="University of Iowa Organ Studio logo">
+  <img src="Organ-Studio-LockupStacked-RGB.svg" alt="University of Iowa School of Music">
+</div>
 
 <script>
+/* ========================================================================== 
+   Full app (complete). Changes:
+   - "tonics" removed.
+   - Include grid (spelled-tonics) implemented in the Include area.
+   - Include all/none buttons wired; default = all lit.
+   - Historic/Modern radio labels show selected state.
+   ========================================================================== */
+
 (async function () {
 // -------------------- CONSTANTS --------------------
 const BASE_PITCH = { 'C':0,'D':2,'E':4,'F':5,'G':7,'A':9,'B':11 };
@@ -563,6 +346,7 @@ const downloadTraceBtn = document.getElementById('downloadTrace');
 const modeTagline = document.getElementById('modeTagline');
 const historicalStatus = document.getElementById('historicalStatus');
 
+
 // Accidentals (Historic/Modern)
 const accRadios = Array.from(document.querySelectorAll('input[name="accMode"]'));
 let ACC_MODE = 'historic'; // 'historic' | 'modern'
@@ -572,6 +356,12 @@ const keyButtons = Array.from(document.querySelectorAll('.key-btn'));
 const selectAllKeysBtn = document.getElementById('selectAllKeys');
 const selectNoneKeysBtn = document.getElementById('selectNoneKeys');
 let enabledCounts = new Set([0,1,2,3,4,5,6,7]);
+
+// Include spelled-tonics grid
+const includeGridEl = document.getElementById('includeGrid');
+const includeSelectAllBtn = document.getElementById('includeSelectAll');
+const includeSelectNoneBtn = document.getElementById('includeSelectNone');
+let allowedTonicBases = new Set(); // elements like "F#", "B-", "C" where flats use '-' glyph
 
 // Scale / Spacing (UI-only)
 const scaleSlider = document.getElementById('scaleSlider');
@@ -642,17 +432,8 @@ const octPlus = document.getElementById('octPlus');
 // -------------------- Filter state (internal) --------------------
 const selected = { dir: new Set(), mode: new Set(), diff: new Set() };
 
-// -------------------- Catalog / state (MOVED BEFORE INITIALIZERS) --------------------
-let catalog = []; // <<<< IMPORTANT: declared early so initializers can reference safely
-let currentKrn = '';
-let currentEntry = null;
-let lastTargetTonic = '';
-let lastTargetMode = '';
-let lastOriginalKey = '';
-let lastOriginalMode = '';
-let lastRenderTranspose = ''; // what was sent to verovio transpose (tonic or numeric)
-let transposePreferFlats = false;
-let currentRenderSemitoneShift = 0;
+// make sure catalog exists before any UI code calls currentMatches()
+let catalog = [];
 
 // --- DEFAULT SELECTED: Direction, Mode, Level buttons (visual only) ---
 (function initDefaultFilterSelections(){
@@ -694,8 +475,10 @@ let currentRenderSemitoneShift = 0;
 
 // -------------------- Utils --------------------
 function setStatus(txt, isErr){
-  status.textContent = 'Status: ' + txt;
-  status.style.color = isErr ? 'crimson' : '';
+  if (status) {
+    status.textContent = 'Status: ' + txt;
+    status.style.color = isErr ? 'crimson' : '';
+  }
 }
 function escapeHtml(str){
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -775,7 +558,7 @@ function buildScale(tonicStr, mode){
   return scale;
 }
 
-// --------- NEW: compute spelled interval from original key to target key ----------
+// --------- compute spelled interval from original key to target key ----------
 const PERFECT_CLASSES = new Set([1,4,5]);
 const MAJOR_BASE = {2:2,3:4,6:9,7:11}; // semitones for Major intervals
 const PERFECT_BASE = {1:0,4:5,5:7};
@@ -824,7 +607,7 @@ function computeKeyToKeyInterval(origTonicStr, targetTonicStr){
   return { number: num, quality, semitones: ((totalSemitones % 12) + 12) % 12 };
 }
 
-// --------- NEW: transpose ANY spelled pitch by a spelled interval (letter-preserving) ----------
+// transpose ANY spelled pitch by a spelled interval (letter-preserving) ----------
 function transposeSpelledPitchByInterval(originalLetter, originalAcc, interval){
   // Step 1: letter motion
   const targetLetter = letterStepsUp(originalLetter, interval.number - 1);
@@ -840,7 +623,7 @@ function transposeSpelledPitchByInterval(originalLetter, originalAcc, interval){
   return { letter: targetLetter, acc, semitone: targSem };
 }
 
-// ------------- Diatonic spelling for a numeral above (works for chromatic bass) -------------
+// Diatonic spelling for a numeral above (works for chromatic bass) -------------
 function diatonicSpelling(tonicStr, mode, bassSpelled, numeral){
   // Compute the diatonic *letter* N above bass
   let letter = bassSpelled.letter;
@@ -946,12 +729,12 @@ function traceDownload(){
   a.remove();
   URL.revokeObjectURL(url);
 }
-traceToggle.addEventListener('change', (e)=>{
+if (traceToggle) traceToggle.addEventListener('change', (e)=>{
   TRACE_ON = e.target.checked;
   renderTrace();
 });
-clearTraceBtn.addEventListener('click', traceClear);
-downloadTraceBtn.addEventListener('click', traceDownload);
+if (clearTraceBtn) clearTraceBtn.addEventListener('click', traceClear);
+if (downloadTraceBtn) downloadTraceBtn.addEventListener('click', traceDownload);
 
 // -------------------- Courtesy / suppression / modern override --------------------
 function suppressThirdFourthSpinesAfterKey(krnText){
@@ -1074,7 +857,7 @@ function applyCourtesyFromSpine4(krnText){
   return { text: out.join('\n'), conflicts };
 }
 
-// ------------- Resolve q/Nq after modern override, using spelled interval -------------
+// ------------- Resolve qInSpine2 -------------
 function resolveQInSpine2(krnText, targetTonic, targetMode){
   if (!targetTonic) return krnText;
 
@@ -1084,7 +867,7 @@ function resolveQInSpine2(krnText, targetTonic, targetMode){
   let lastBass = null;
 
   // Original key
-  const firstKeyMatch = krnText.match(/^\*([A-Ga-g])([#\u266f\-b]{0,2})\s*:/m);
+  const firstKeyMatch = krnText.match(/^\*([A-Ga-g])([#\u266f-]{0,2})\s*:/m);
   const origKey = firstKeyMatch
     ? normalizeTonicForHumdrum(firstKeyMatch[1] + (firstKeyMatch[2]||''))
     : null;
@@ -1352,7 +1135,7 @@ function transformFiguresForTonicWithTrace(originalKrn, targetTonic, targetMode)
   return outLines.join('\n');
 }
 
-// -------------------- Catalog / filters / UI helpers --------------------
+// -------------------- Catalog / filters / UI --------------------
 function capitalize(s){ return String(s || '').replace(/^\w/, c => c.toUpperCase()); }
 function updatePillsFromCatalogEntry(entry){
   function uc(s){ return String(s||'').replace(/^\w/, c => c.toUpperCase()); }
@@ -1382,6 +1165,16 @@ function updateKeyPill(tonic, mode){
   if (!tonic) document.getElementById('keyPill').style.display = 'none';
   else document.getElementById('keyPill').style.display = '';
 }
+
+let currentKrn = '';
+let currentEntry = null;
+let lastTargetTonic = '';
+let lastTargetMode = '';
+let lastOriginalKey = '';
+let lastOriginalMode = '';
+let lastRenderTranspose = ''; // what was sent to verovio transpose (tonic or numeric)
+let transposePreferFlats = false;
+let currentRenderSemitoneShift = 0;
 
 // -------------------- Fetch helpers --------------------
 async function fetchList(){
@@ -1477,7 +1270,7 @@ function updateMatchCount(){
   if (matchCount) matchCount.textContent = String(currentMatches().length);
 }
 
-// -------------------- Key button helpers --------------------
+// -------------------- Key button helpers (fixed) --------------------
 function refreshKeyButtonsUI(){
   keyButtons.forEach(btn => {
     const c = Number(btn.dataset.count);
@@ -1502,14 +1295,18 @@ selectAllKeysBtn.addEventListener('click', () => {
   for (let i=0;i<=7;i++) enabledCounts.add(i);
   refreshKeyButtonsUI();
   updateMatchCount();
+  // also select all spelled-tonics for convenience
+  selectAllIncludeTonics();
 });
 selectNoneKeysBtn.addEventListener('click', () => {
   enabledCounts.clear();
   refreshKeyButtonsUI();
   updateMatchCount();
+  // also clear include spelled-tonics
+  clearAllIncludeTonics();
 });
 
-// -------------------- Build allowed tonics --------------------
+// -------------------- Build allowed tonics (original) --------------------
 function buildAllowedTonicsForMode(mode){
   const byCount = (mode === 'minor') ? MINOR_BY_COUNT : MAJOR_BY_COUNT;
   const allowed = [];
@@ -1519,6 +1316,121 @@ function buildAllowedTonicsForMode(mode){
     for (const tonic of byCount[c] || []) allowed.push(tonic);
   }
   return allowed;
+}
+
+// -------------------- INCLUDE grid wiring (spelled-tonics) --------------------
+function uniqueTonicBasesFromMaps(){
+  const set = new Set();
+  for (const arr of Object.values(MAJOR_BY_COUNT)) for (const t of arr) {
+    const n = normalizeTonicForHumdrum(t);
+    if (!n) continue;
+    const p = parseTonicString(n);
+    if (!p) continue;
+    const base = p.letter + (p.acc === 'n' ? '' : p.acc);
+    set.add(base);
+  }
+  for (const arr of Object.values(MINOR_BY_COUNT)) for (const t of arr) {
+    const n = normalizeTonicForHumdrum(t);
+    if (!n) continue;
+    const p = parseTonicString(n);
+    if (!p) continue;
+    const base = p.letter + (p.acc === 'n' ? '' : p.acc);
+    set.add(base);
+  }
+  return Array.from(set).sort((a,b)=>{
+    const order='CDEFGAB';
+    const ia = order.indexOf(a[0]), ib = order.indexOf(b[0]);
+    if (ia !== ib) return ia-ib;
+    if (a.length !== b.length) return a.length - b.length;
+    return a.localeCompare(b);
+  });
+}
+
+function renderIncludeButtons(){
+  const list = uniqueTonicBasesFromMaps();
+  includeGridEl.innerHTML = '';
+  list.forEach(base => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'include-btn';
+    const display = base.replace(/--/g,'♭♭').replace(/-/g,'♭').replace(/#/g,'♯');
+    btn.textContent = display;
+    btn.dataset.base = base;
+    btn.addEventListener('click', () => {
+      const b = btn.dataset.base;
+      if (allowedTonicBases.has(b)) {
+        allowedTonicBases.delete(b);
+        btn.classList.remove('toggled');
+      } else {
+        allowedTonicBases.add(b);
+        btn.classList.add('toggled');
+      }
+    });
+    includeGridEl.appendChild(btn);
+  });
+}
+renderIncludeButtons();
+
+function selectAllIncludeTonics(){
+  allowedTonicBases.clear();
+  const btns = Array.from(includeGridEl.querySelectorAll('.include-btn'));
+  btns.forEach(btn => {
+    const b = btn.dataset.base;
+    allowedTonicBases.add(b);
+    btn.classList.add('toggled');
+  });
+}
+function clearAllIncludeTonics(){
+  allowedTonicBases.clear();
+  const btns = Array.from(includeGridEl.querySelectorAll('.include-btn'));
+  btns.forEach(btn => btn.classList.remove('toggled'));
+}
+
+// Wire the include all/none buttons
+if (includeSelectAllBtn) {
+  includeSelectAllBtn.addEventListener('click', () => {
+    selectAllIncludeTonics();
+  });
+}
+if (includeSelectNoneBtn) {
+  includeSelectNoneBtn.addEventListener('click', () => {
+    clearAllIncludeTonics();
+  });
+}
+
+// -------------------- Effective allowed tonics (updated) --------------------
+function getEffectiveAllowedTonicsForMode(mode){
+  // If the user selected spelled tonics, filter allowed tonics by these bases.
+  const allowedByCount = buildAllowedTonicsForMode(mode);
+  if (allowedTonicBases.size === 0) return allowedByCount;
+
+  const out = [];
+  // Prepare allowed base specs: {letter, accOrEmpty}
+  const allowedSpecs = Array.from(allowedTonicBases).map(b => {
+    const letter = b[0].toUpperCase();
+    const acc = b.length > 1 ? b.slice(1) : '';
+    return {letter, acc};
+  });
+
+  for (const t of allowedByCount){
+    const n = normalizeTonicForHumdrum(t);
+    const p = parseTonicString(n);
+    if (!p) continue;
+    const candLetter = p.letter; // uppercase
+    const candAcc = p.acc === 'n' ? '' : p.acc; // '' | '#' | '-'
+    // If any allowedSpec matches this candidate:
+    for (const spec of allowedSpecs){
+      if (candLetter !== spec.letter) continue;
+      const specAcc = spec.acc; // '' | '#' | '-'
+      if (specAcc === '') {
+        if (candAcc === '') { out.push(t); break; }
+      } else {
+        if (candAcc === specAcc) { out.push(t); break; }
+      }
+    }
+  }
+
+  return out;
 }
 
 // -------------------- Rendering --------------------
@@ -1716,20 +1628,20 @@ function setTargetTonic(tonic){
   runPipelineForEntry(currentEntry, t, lastTargetMode);
 }
 
-tpPlus.addEventListener('click', () => {
+if (tpPlus) tpPlus.addEventListener('click', () => {
   traceLog('tpPlus pressed (semitone up)');
   if (!lastTargetTonic || !lastTargetMode) { traceLog('tpPlus: no current spelled tonic; nothing to do'); return; }
   const next = pickSpelledTonicBySemitoneStep(lastTargetTonic, lastTargetMode, +1);
   if (next) { traceLog(`tpPlus -> chosen spelled tonic ${next}`); setTargetTonic(next); } else { traceLog('tpPlus: failed to find next spelled tonic - no change'); }
 });
-tpMinus.addEventListener('click', () => {
+if (tpMinus) tpMinus.addEventListener('click', () => {
   traceLog('tpMinus pressed (semitone down)');
   if (!lastTargetTonic || !lastTargetMode) { traceLog('tpMinus: no current spelled tonic; nothing to do'); return; }
   const next = pickSpelledTonicBySemitoneStep(lastTargetTonic, lastTargetMode, -1);
   if (next) { traceLog(`tpMinus -> chosen spelled tonic ${next}`); setTargetTonic(next); } else { traceLog('tpMinus: failed to find next spelled tonic - no change'); }
 });
 
-tpToggle.addEventListener('click', () => {
+if (tpToggle) tpToggle.addEventListener('click', () => {
   traceLog('tpToggle clicked');
   if (!lastTargetTonic || !lastTargetMode) {
     transposePreferFlats = !transposePreferFlats;
@@ -1763,14 +1675,27 @@ function applyRenderSemitoneShift(delta){
   // Keep key pill showing the spelled target key (do not change it)
   updateKeyPill(lastTargetTonic || '', lastTargetMode || '');
 }
-octPlus.addEventListener('click', () => { traceLog('octPlus clicked'); applyRenderSemitoneShift(+12); });
-octMinus.addEventListener('click', () => { traceLog('octMinus clicked'); applyRenderSemitoneShift(-12); });
+if (octPlus) octPlus.addEventListener('click', () => { traceLog('octPlus clicked'); applyRenderSemitoneShift(+12); });
+if (octMinus) octMinus.addEventListener('click', () => { traceLog('octMinus clicked'); applyRenderSemitoneShift(-12); });
 
-// -------------------- Accidentals toggle re-run --------------------
+// -------------------- Accidentals toggle re-run + label visuals --------------------
+const labelHistoric = document.getElementById('labelHistoric');
+const labelModern = document.getElementById('labelModern');
+function updateAccLabelVisuals(){
+  const checked = document.querySelector('input[name="accMode"]:checked');
+  if (checked && checked.value === 'modern') {
+    labelModern.classList.add('selected');
+    labelHistoric.classList.remove('selected');
+  } else {
+    labelHistoric.classList.add('selected');
+    labelModern.classList.remove('selected');
+  }
+}
 accRadios.forEach(r => {
   r.addEventListener('change', () => {
     if (!r.checked) return;
     ACC_MODE = r.value === 'modern' ? 'modern' : 'historic';
+    updateAccLabelVisuals();
     traceLog(`Accidentals mode changed => ${ACC_MODE}`);
     if (currentEntry && lastTargetTonic && lastTargetMode) {
       runPipelineForEntry(currentEntry, lastTargetTonic, lastTargetMode);
@@ -1782,8 +1707,9 @@ accRadios.forEach(r => {
     }
   });
 });
+updateAccLabelVisuals(); // initialize visual
 
-// -------------------- Filter button wiring --------------------
+// -------------------- Filter button wiring (FIX) --------------------
 // Utility to toggle a value in a Set and update UI/counts
 function toggleFilterValue(filterName, value, btnEl) {
   const set = selected[filterName];
@@ -1832,17 +1758,18 @@ if (clearBtn) {
   });
 }
 
-// -------------------- Sample / Random wiring --------------------
+// -------------------- Sample / Random wiring (UPDATED to respect include spelled-tonics) ----
 randomBtn.addEventListener('click', async () => {
   const pick = catalog.length ? pickRandom(currentMatches()) : { path:'sample', text: sample, dir:'descending', mode:'major', diff:1, title:'Sample' };
   currentEntry = pick;
   const m = pick.mode || (pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1] === pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1]?.toUpperCase() ? 'major' : 'minor') || 'major';
 
-  const allowedTonics = buildAllowedTonicsForMode(m);
+  // Use effective allowed tonics (if include toned selected, they filter the candidates)
+  const allowedTonics = getEffectiveAllowedTonicsForMode(m);
   traceLog(`Allowed tonics for mode=${m}: ${JSON.stringify(allowedTonics)}`);
 
  if (!allowedTonics.length){
-  const msg = 'No allowed keys selected for this mode. Enable one or more key-range buttons (0..7).';
+  const msg = 'No allowed keys selected for this mode. Enable one or more key-range buttons (0..7) or choose Include keys.';
   setStatus(msg, true);
   traceLog('ERROR: ' + msg);
   updatePillsFromCatalogEntry(pick);
@@ -1907,6 +1834,14 @@ if (paths.length){
 } else {
   setStatus('No tunes.json found — using sample.');
 }
+
+// By default include all spelled tonics (user asked default = all lit up)
+selectAllIncludeTonics();
+
+// Also make sure key-range default selected matches earlier behavior (all)
+for (let i=0;i<=7;i++) enabledCounts.add(i);
+refreshKeyButtonsUI();
+updateMatchCount();
 
 if (!currentKrn) {
   currentEntry = { path:'sample', text: sample, dir:'descending', mode:'major', diff:1, title:'Sample' };
