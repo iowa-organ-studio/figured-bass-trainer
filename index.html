@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Verovio — figure-aware transposer (Historic/Modern + Courtesy)</title>
+<title>CPE Bach Rule of the Octave Randomizer</title>
 <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js"></script>
 <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-hum.js"></script>
 <style>
@@ -30,7 +30,7 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 /* ======= CONSTRAIN TOP ROW WIDTH (no full-page stretch) ======= */
 .controls-row{
   display:grid;
-  grid-template-columns: auto auto max-content;  
+  grid-template-columns: 0.55fr 0.75fr 0.55fr;
   gap:8px;
   align-items:start;
   max-width:980px;
@@ -227,6 +227,151 @@ input[type=range]::-webkit-slider-thumb{
 
 /* humdrum panel monospace */
 #humPanel { font-size:0.9rem; line-height:1.25; }
+
+/* ===========================================================
+   UI MERGE PATCH — VISUAL ONLY (no functional changes)
+   =========================================================== */
+
+/* Controls row: prevent stretch of right card */
+.controls-row{
+  grid-template-columns: auto auto max-content;
+  align-items:stretch;
+}
+
+/* Key range: make buttons a bit taller to match Scale/Spacing height */
+.key-btn{
+  padding:6px 8px;      /* taller, same width */
+  min-height:28px;
+  font-size:.75rem;
+  font-weight:500;
+}
+
+/* Scale/Spacing: size to content (no right whitespace) */
+.mid-card{
+  width:max-content;
+  max-width:100%;
+}
+
+/* Transpose/Octave: crop right side, size to content, bigger enharmonic toggle */
+.right-card{
+  width:max-content;
+  max-width:100%;
+  padding-right:4px;        /* crop right padding */
+}
+.transpose-block{
+  gap:6px;
+  min-height:42px;
+  justify-content:flex-start;
+}
+#tpToggle{
+  padding:10px 16px;        /* larger */
+  font-size:1rem;
+  align-self:center;
+  margin-right:0;
+}
+
+/* Filters: present each .group like a small card on a single horizontal strip */
+.filters-line{
+  gap:8px;
+}
+.filters-line .group{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:6px 8px;
+}
+.filters-line .group .chip-row{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.filters-line .group .small{
+  font-size:.82rem;
+  font-weight:700;
+  color:#333;
+}
+
+/* Hide Dir: and Mode: labels for a cleaner look */
+.filters-line .group:nth-child(1) .small,
+.filters-line .group:nth-child(2) .small{
+  display:none;
+}
+
+/* Replace "Lvl:" label visually with "Level" (content unchanged) */
+.filters-line .group:nth-child(3) .small{
+  position:relative;
+  color:transparent;
+}
+.filters-line .group:nth-child(3) .small::before{
+  content:"Level";
+  position:absolute;
+  left:0;
+  color:#333;
+}
+
+/* Accidentals radios styled as toggle pills (behavior unchanged) */
+.radio-inline input[type="radio"]{
+  position:absolute;
+  opacity:0;
+  width:0;
+  height:0;
+}
+.radio-inline label{
+  background:var(--grey);
+  border:1px solid var(--border);
+  padding:4px 10px;
+  border-radius:10px;
+  font-weight:500;
+  font-size:.78rem;
+  color:#222;
+}
+/* Chrome supports :has(); this highlights the active radio visually */
+.radio-inline label:has(input[type="radio"]:checked){
+  background:var(--butter);
+  border-color:var(--gold);
+  color:var(--gold-ink);
+}
+
+/* Hide Historical=... text in tagline (visual only, logic unchanged) */
+#historicalStatus{ display:none; }
+
+humdrum-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: #333;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.humdrum-toggle:hover {
+  background: #fdfdfd;
+}
+
+.humdrum-chevron {
+  font-weight: 800;
+  color: #555;
+}
+
+/* Keep original label in DOM but hide it visually (we insert a new toggle above the panel) */
+.humdrum-original-label {
+  display: none !important;
+}
+
+#logoAfterFilters img {
+  max-width: 66%;
+  height: auto;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 </style>
 </head>
 <body>
@@ -359,6 +504,8 @@ input[type=range]::-webkit-slider-thumb{
     </div>
   </div>
 
+  
+
   <!-- Humdrum panel -->
   <label class="small" style="margin-top:8px;display:block">Displayed humdrum / .krn (absolute original shown below):</label>
   <div id="humPanel" class="card" style="margin-top:8px;white-space:pre-wrap;font-family:monospace">(no file loaded)</div>
@@ -377,6 +524,11 @@ input[type=range]::-webkit-slider-thumb{
     <div id="tracePanel" class="card" style="margin-top:6px;white-space:pre-wrap;font-family:monospace">(trace disabled)</div>
   </div>
 </div>
+
+  <!-- Logo directly after filters -->
+  <div id="logoAfterFilters" aria-label="University of Iowa Organ Studio logo">
+    <img src="Organ-Studio-LockupStacked-RGB.svg" alt="University of Iowa School of Music">
+  </div>
 
 <script>
 (async function () {
@@ -441,6 +593,72 @@ const tpPlus = document.getElementById('tpPlus');
 const tpToggle= document.getElementById('tpToggle');
 const octMinus= document.getElementById('octMinus');
 const octPlus = document.getElementById('octPlus');
+// --- HUMDRUM: default collapsed with chevron toggle (visual-only) ---
+(function initHumdrumCollapsed() {
+  const humPanelEl = document.getElementById('humPanel');
+  if (!humPanelEl) return;
+
+  // Hide the original label (keep in DOM)
+  const humLabel = Array.from(document.querySelectorAll('label.small')).find(l =>
+    /displayed humdrum|humdrum/i.test((l.textContent || '').trim())
+  );
+  if (humLabel) humLabel.classList.add('humdrum-original-label');
+
+  // Create the new toggle
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'humdrum-toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', 'humPanel');
+
+  const chev = document.createElement('span');
+  chev.className = 'humdrum-chevron';
+  chev.textContent = '►'; // closed
+
+  const txt = document.createElement('span');
+  txt.textContent = 'Humdrum panel -- click to open';
+
+  toggle.appendChild(chev);
+  toggle.appendChild(txt);
+
+  // Insert above the panel and start collapsed
+  humPanelEl.parentNode.insertBefore(toggle, humPanelEl);
+  humPanelEl.style.display = 'none';
+
+  toggle.addEventListener('click', () => {
+    const isOpen = humPanelEl.style.display !== 'none';
+    if (isOpen) {
+      humPanelEl.style.display = 'none';
+      toggle.setAttribute('aria-expanded', 'false');
+      chev.textContent = '►';
+      txt.textContent = 'Humdrum panel -- click to open';
+    } else {
+      humPanelEl.style.display = 'block';
+      toggle.setAttribute('aria-expanded', 'true');
+      chev.textContent = '▼';
+      txt.textContent = 'Humdrum panel -- click to close';
+    }
+  });
+})();
+
+// --- DEFAULT SELECTED: Direction, Mode, Level buttons (visual only) ---
+(function initDefaultFilterSelections(){
+  // Direction
+  document.querySelectorAll('#dirRow .btn').forEach(btn => {
+    btn.classList.add('selected');
+  });
+
+  // Mode
+  document.querySelectorAll('#modeRow .btn').forEach(btn => {
+    btn.classList.add('selected');
+  });
+
+  // Level 1–7
+  document.querySelectorAll('#diffRow .btn').forEach(btn => {
+    btn.classList.add('selected');
+  });
+})();
+
 
 // -------------------- Utils --------------------
 function setStatus(txt, isErr){
