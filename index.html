@@ -42,6 +42,38 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #keyPill{ display:inline-block; }
 .title-pill small{ color:var(--muted); font-weight:500; margin-left:6px}
 
+/* Make header a flex row and vertically center items */
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;              /* optional spacing between items */
+  padding: 8px 12px;     /* adjust to match your layout */
+}
+
+/* Push the studio credit to the far right */
+.studio-credit {
+  margin-left: auto;     /* the magic that forces it to the right */
+  font-weight: 700;      /* keep your bold weight */
+  white-space: nowrap;   /* prevent awkward wrapping on wide screens */
+  font-size: 0.95rem;    /* tweak to taste */
+}
+
+/* Responsive: on narrow screens, wrap and make the credit full width and right aligned */
+@media (max-width: 640px) {
+  header {
+    flex-wrap: wrap;      /* allow items to break to next line */
+    gap: 6px;
+  }
+  .studio-credit {
+    margin-left: 0;       /* remove auto so it no longer tries to occupy flex gap */
+    order: 3;             /* put it after other header items (adjust if needed) */
+    width: 100%;          /* full width line */
+    text-align: right;    /* keep the text visually right-justified on its own line */
+    padding-top: 6px;     /* tiny spacing from row above */
+  }
+}
+
+
 /* ======= Buttons ======= */
 .btn{
   padding:4px 8px;border-radius:999px;border:1px solid var(--grey);
@@ -125,6 +157,16 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   background:var(--butter);border-color:var(--gold);color:var(--gold-ink)
 }
 
+/* NEW: Keep the FB placement card tidy and chip-highlight the selected label */
+.group[data-role="fig-place"] { /* already top-aligned via inline; keep here for clarity */ }
+#figPlaceInline label.selected {
+  background: var(--butter);
+  border-color: var(--gold);
+  color: var(--gold-ink);
+}
+/* If you ever show native radios, this accent helps. Your radios are hidden, so optional. */
+input[type="radio"] { accent-color: var(--gold); }
+
 /* ======= Include spelled-tonics grid (replaces previous pc-grid) ======= */
 .include-grid{display:flex;flex-wrap:wrap;gap:6px;max-width:720px}
 .include-btn{
@@ -159,15 +201,20 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
 <div class="card">
   <!-- ===== Row 1: New Bass Line, Title, Key ===== -->
+   <!-- ===== Row 1: New Bass Line, Title, Key ===== -->
   <header>
     <button id="randomFiltered" class="new-bass-btn" type="button">New Bass Line</button>
+
     <div class="title-badges" id="titlePills" aria-hidden="false" style="margin-left:6px">
       <div class="title-pill" id="titlePill">No title <small id="titleSub"></small></div>
       <div class="title-pill" id="keyPill"><span id="keyPillValue">original</span></div>
-       <strong style="font-weight:700">Created for the University of Iowa Organ Studio</strong>
+      <!-- NOTE: the studio credit was removed from here -->
     </div>
-    <div class="spacer"></div>
+
+    <!-- Studio credit moved outside the title-badges so it can be pushed to the far right -->
+    <strong class="studio-credit">Created for the University of Iowa Organ Studio</strong>
   </header>
+
 
   <!-- ===== Row 2: Music viewer ===== -->
   <div id="viewer" class="card" style="margin-top:8px">
@@ -297,6 +344,15 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
       </div>
       <div class="include-grid" id="includeGrid" aria-label="Spelled tonics to include (select to restrict)"></div>
     </div>
+<!-- NEW: Figured-bass placement (own card to the right of Include) -->
+    <div class="group" data-role="fig-place" style="align-self:flex-start; min-width:auto;">
+      <div class="small">Figures</div>
+      <div class="radio-inline" id="figPlaceInline">
+        <label id="labelFigBelow"><input type="radio" name="figPlace" id="fbBelow" value="below" checked> below</label>
+        <label id="labelFigAbove"><input type="radio" name="figPlace" id="fbAbove" value="above"> above</label>
+      </div>
+    </div>
+
   </div>
 
   <!-- ===== Humdrum panel ===== -->
@@ -371,6 +427,9 @@ const historicalStatus = document.getElementById('historicalStatus');
 // Accidentals (Historic/Modern)
 const accRadios = Array.from(document.querySelectorAll('input[name="accMode"]'));
 let ACC_MODE = 'historic'; // 'historic' | 'modern'
+
+// NEW: Figured-bass placement state (false = below **fb, true = above **fba)
+let FB_ABOVE = false;
 
 // Key range state/UI
 const keyButtons = Array.from(document.querySelectorAll('.key-btn'));
@@ -887,6 +946,8 @@ function resolveQInSpine2(krnText, targetTonic, targetMode){
   let afterKey = false;
   let lastBass = null;
 
+
+
   // Original key
   const firstKeyMatch = krnText.match(/^\*([A-Ga-g])([#\u266f-]{0,2})\s*:/m);
   const origKey = firstKeyMatch
@@ -959,6 +1020,86 @@ function resolveQInSpine2(krnText, targetTonic, targetMode){
   });
 
   return out.join('\n');
+}
+
+// -------------------- Figured-bass placement transformer --------------------
+// Switch **fb <-> **fba in header and manage 'x' padding for alignment when above.
+function applyFiguredBassPlacement(krnText, placeAbove) {
+  if (!krnText) return krnText;
+  const lines = krnText.split(/\r?\n/);
+  let headerLineIdx = -1;
+  let fbIndex = -1;
+
+  // 1) Find the first header line containing **spines and locate the **fb/**fba spine index
+  for (let i = 0; i < lines.length; i++) {
+    const s = lines[i];
+    if (!/\*\*/.test(s)) continue; // not a spine header
+    const toks = s.split('\t');
+    for (let c = 0; c < toks.length; c++) {
+      if (/^\*\*fb(?:a)?\b/.test(toks[c])) {
+        fbIndex = c;
+      }
+    }
+    headerLineIdx = i;
+    break;
+  }
+  if (headerLineIdx < 0 || fbIndex < 0) return krnText; // no **fb/**fba spine found
+
+  // 2) Rewrite header token: **fb -> **fba for above, and reverse for below
+  {
+    const toks = lines[headerLineIdx].split('\t');
+    toks[fbIndex] = placeAbove
+      ? toks[fbIndex].replace(/^\*\*fb(?:a)?/, '**fba')
+      : toks[fbIndex].replace(/^\*\*fba/, '**fb');
+    lines[headerLineIdx] = toks.join('\t');
+  }
+
+  // 3) Compute global max number of numerals across the fb spine (for top-alignment)
+  function countNumerals(tok) {
+    if (!tok || tok === '.' || /^[\*\=\!\|]/.test(tok)) return 0;
+    const parts = tok.trim().split(/\s+/);
+    let numerals = 0;
+    for (const p of parts) {
+      const m = p.match(/\d+/g);
+      numerals += m ? m.length : (/\d/.test(p) ? 1 : 0);
+    }
+    return numerals || (parts.some(p => /\d/.test(p)) ? 1 : 0);
+  }
+  let globalMax = 0;
+  for (let i = headerLineIdx + 1; i < lines.length; i++) {
+    const s = lines[i];
+    if (!s.includes('\t')) continue;
+    const toks = s.split('\t');
+    const tok = toks[fbIndex];
+    if (!tok || tok === '.' || /^[\*\=\!\|]/.test(tok)) continue;
+    globalMax = Math.max(globalMax, countNumerals(tok));
+  }
+
+  // 4) Transform data rows: when placing above, apply leading 'x' padding; below strips them
+  for (let i = headerLineIdx + 1; i < lines.length; i++) {
+    const s = lines[i];
+    if (!s.includes('\t')) continue;
+    const toks = s.split('\t');
+    let tok = toks[fbIndex] || '';
+    if (!tok || tok === '.' || /^[\*\=\!\|]/.test(tok)) { lines[i] = toks.join('\t'); continue; }
+
+    const parts = tok.trim().split(/\s+/);
+    // Normalize any preexisting padding by removing leading x
+    while (parts[0] === 'x') parts.shift();
+
+    if (placeAbove) {
+      const numeralsHere = countNumerals(parts.join(' ')) || 1;
+      const need = Math.max(0, globalMax - Math.max(1, numeralsHere));
+      tok = (need > 0 ? ('x '.repeat(need)) : '') + parts.join(' ');
+      toks[fbIndex] = tok.trim();
+    } else {
+      // below: no padding
+      toks[fbIndex] = parts.join(' ');
+    }
+    lines[i] = toks.join('\t');
+  }
+
+  return lines.join('\n');
 }
 
 // -------------------- Figure-aware transform (spines 1 & 2) --------------------
@@ -1196,6 +1337,9 @@ let lastOriginalMode = '';
 let lastRenderTranspose = ''; // what was sent to verovio transpose (tonic or numeric)
 let transposePreferFlats = false;
 let currentRenderSemitoneShift = 0;
+
+// NEW: Keep a copy of the transposed text BEFORE placement (so radios can re-apply quickly)
+let lastTransformedKrn = '';
 
 // -------------------- Fetch helpers --------------------
 async function fetchList(){
@@ -1538,7 +1682,10 @@ function runPipelineForEntry(entry, tonic, m){
     String(tonic || '').trim(),
     m
   );
-  currentKrn = transformed;
+
+  // Save the pre-placement form, then apply placement
+  lastTransformedKrn = transformed;
+  currentKrn = applyFiguredBassPlacement(lastTransformedKrn, FB_ABOVE);
 
   // Humdrum panel
   humPanel.textContent = '';
@@ -1548,8 +1695,10 @@ function runPipelineForEntry(entry, tonic, m){
   humPanel.textContent += krnSentToVerovio + '\n\n';
   humPanel.textContent += `## TARGET KEY: ${formatKeyName(tonic, m)}\n\n`;
   humPanel.textContent += '## 3) Transpose output (after figure-aware transform)\n\n';
+  humPanel.textContent += lastTransformedKrn + '\n\n';
+  humPanel.textContent += `## 4) Placement applied: ${FB_ABOVE ? 'ABOVE (**fba + x-padding)' : 'BELOW (**fb)'}\n\n`;
   humPanel.textContent += currentKrn + '\n\n';
-  humPanel.textContent += `## 4) Historical mode status: Historical=${ACC_MODE==='historic' ? 'TRUE' : 'FALSE'}\n`;
+  humPanel.textContent += `## 5) Historical mode status: Historical=${ACC_MODE==='historic' ? 'TRUE' : 'FALSE'}\n`;
 
   // Remember keys so toggles can act
   lastTargetTonic = tonic;
@@ -1742,6 +1891,45 @@ accRadios.forEach(r => {
   });
 });
 updateAccLabelVisuals(); // initialize visual
+
+// -------------------- Figured-bass placement radio wiring --------------------
+function updateFigPlaceLabelVisuals() {
+  const fbAbove = document.getElementById('fbAbove');
+  const fbBelow = document.getElementById('fbBelow');
+  const labA = document.getElementById('labelFigAbove');
+  const labB = document.getElementById('labelFigBelow');
+  const above = !!(fbAbove && fbAbove.checked);
+  if (labA) labA.classList.toggle('selected', above);
+  if (labB) labB.classList.toggle('selected', !above);
+}
+
+(function initFigPlacementRadios(){
+  const fbAbove = document.getElementById('fbAbove');
+  const fbBelow = document.getElementById('fbBelow');
+
+  const applyAndRender = () => {
+    FB_ABOVE = !!(fbAbove && fbAbove.checked);
+    updateFigPlaceLabelVisuals();
+
+    // Re-apply placement to the latest transposed KRn and re-render
+    if (lastTransformedKrn) {
+      currentKrn = applyFiguredBassPlacement(lastTransformedKrn, FB_ABOVE);
+      renderWithVerovio(currentKrn, lastTargetTonic || '');
+
+      // Re-run the pipeline so the Humdrum panel sections stay perfectly in sync
+      if (currentEntry && lastTargetTonic && lastTargetMode) {
+        runPipelineForEntry(currentEntry, lastTargetTonic, lastTargetMode);
+      }
+    }
+  };
+
+  if (fbAbove) fbAbove.addEventListener('change', applyAndRender);
+  if (fbBelow) fbBelow.addEventListener('change', applyAndRender);
+
+  // initial visuals
+  updateFigPlaceLabelVisuals();
+})();
+
 
 // -------------------- Filter button wiring (FIX) --------------------
 // Utility to toggle a value in a Set and update UI/counts
