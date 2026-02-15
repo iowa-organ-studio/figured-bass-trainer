@@ -3,6 +3,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"/>'>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>CPE Bach Rule of the Octave Randomizer</title>
@@ -108,7 +109,29 @@ header {
   max-height: 66px;     /* adjust if you want larger/smaller */
   height: auto;
   display: block;
-  margin: 6px 0 0 0;   /* left-justified (no auto-centering) */
+  margin: 2px 0 0 0;   /* left-justified (no auto-centering) */
+}
+
+/* Tighter vertical padding inside the music viewer card */
+#viewer.card {
+  padding-top: 6px;    /* was 10px via .card */
+  padding-bottom: 6px; /* was 10px via .card */
+}
+
+/* Slightly smaller gap above the viewer card */
+#viewer { margin-top: 4px; }  /* was 8px */
+
+/* Verovio fit-to-viewer helpers */
+#viewer {
+  overflow-x: hidden;  /* avoid horizontal scroll bars */
+  overflow-y: hidden;  /* avoid vertical scroll bars inside the viewer */
+}
+#svg { display: block; }
+#svg svg {
+  display: block;      /* measure width/height cleanly */
+  width: auto;
+  height: auto;
+  margin: 0;
 }
 
 /* Keep historical text in DOM (for JS to touch) but invisible */
@@ -265,7 +288,7 @@ input[type="radio"] { accent-color: var(--gold); }
       <button class="btn" id="spacingPlus">+</button>
       <div class="small-pill" id="spacingValue">0.32</div>
       <!-- Keep slider in DOM for JS; hidden with CSS -->
-      <div class="slider" aria-hidden="true"><input id="spacingSlider" type="range" min="10" max="80" value="32"></div>
+      <div class="slider" aria-hidden="true"><input id="spacingSlider" type="range" min="10" max="120" value="32"></div>
     </div>
   </div>
 
@@ -727,7 +750,29 @@ function diatonicSpelling(tonicStr, mode, bassSpelled, numeral){
 
 // Verovio toolkit
 let vrv;
-const baseOptions = { scale:50, pageWidth:900, adjustPageHeight:true, spacingLinear:0.32, spacingNonLinear:0.46 };
+// Tighter defaults similar to Boyvin
+const baseOptions = {
+  scale: 50,
+
+  // pageWidth will be overwritten by the fit-to-viewer loop each render
+  pageWidth: 900,
+
+  adjustPageHeight: true,
+
+  // Reduce the internal page margins to shrink SVG whitespace
+  pageMarginTop: 8,       // default is larger
+  pageMarginBottom: 10,
+  pageMarginLeft: 12,
+  pageMarginRight: 12,
+
+  // Slightly tighter system and staff spacing
+  spacingSystem: 9,
+  spacingStaff: 8,
+
+  // Your existing spacing values
+  spacingLinear: 0.32,
+  spacingNonLinear: 0.46
+};
 
 // -------------------- Verovio init --------------------
 async function waitForVerovioGlobal(timeout = 10000) {
@@ -1612,28 +1657,133 @@ function tonicToVerovioAscii(tonic) {
     .replace(/\u266d/g, 'b')
     .replace(/\u266f/g, '#');
 }
+
+/* ====== Fit-to-viewer utilities (Humdrum) ====== */
+let lastGoodPageWidth = null;
+let lastRenderReason = "init";
+
+/* Measure the available pixel width inside #viewer (with a floor) */
+function viewerAvailableWidth(){
+  const el = document.getElementById('viewer');
+  if (!el) return 800;
+  const rect = el.getBoundingClientRect();
+  const w = Math.floor(rect.width || el.clientWidth || 0);
+  return Math.max(340, w);
+}
+
+/* Read the intrinsic width of the rendered <svg> in #svg */
+function svgIntrinsicWidthPx(){
+  const svg = document.querySelector('#svg svg');
+  if (!svg) return 0;
+  const wAttr = parseFloat(svg.getAttribute('width') || "0");
+  if (Number.isFinite(wAttr) && wAttr > 0) return wAttr;
+  try{
+    const box = svg.getBBox();
+    return box.width || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/* Render once with a specific pageWidth and transpose */
+function renderHumOnce(krnText, transposeStr, optionsOverride = {}){
+  const { scale, spacingLinear } = getCurrentScaleSpacing();
+
+  const options = {
+    ...baseOptions,
+    pageWidth: Math.max(100, Math.floor(optionsOverride.pageWidth || baseOptions.pageWidth || 900)),
+    scale: Number(scale),
+    spacingLinear: Number(spacingLinear),
+    transpose: String(transposeStr || "")
+  };
+
+  lastRenderTranspose = options.transpose;
+
+  if (vrv) {
+    vrv.setOptions(options);
+    const svg = vrv.renderData(krnText || '', {});
+    svgHost.innerHTML = svg;
+
+    // Ensure there is no vertical clamp; we handle fit via width only
+    const viewer = document.getElementById('viewer');
+    if (viewer) viewer.style.maxHeight = "";
+  } else {
+    svgHost.textContent = '(verovio not initialized) — preview disabled';
+  }
+}
+
+/* Iteratively fit the rendered SVG width to nearly fill the viewer */
+async function fitPageWidthToViewerHum(krnText, transposeStr){
+  const avail = viewerAvailableWidth();
+  const hardMax = Math.floor(avail - 6);  // small safety margin
+  const FILL_TARGET = 0.92;               // aim for ~92% of container
+
+  // Heuristic: reuse last good width unless spacing just changed
+  let pw = (lastGoodPageWidth && Math.abs(lastGoodPageWidth - avail) < 260 && lastRenderReason !== "spacing")
+    ? lastGoodPageWidth
+    : avail;
+
+  // 1) initial render
+  renderHumOnce(krnText, transposeStr, { pageWidth: pw });
+  let w = svgIntrinsicWidthPx();
+
+  // 2) shrink if necessary
+  let tries = 0;
+  while (w > hardMax && tries < 8){
+    pw = Math.max(320, Math.floor(pw * 0.94));
+    renderHumOnce(krnText, transposeStr, { pageWidth: pw });
+    w = svgIntrinsicWidthPx();
+    tries++;
+  }
+
+  // 3) grow toward target fill
+  tries = 0;
+  while (w > 0 && w < hardMax * FILL_TARGET && tries < 10){
+    const bump = Math.max(16, Math.floor((hardMax - w) * 0.35));
+    pw = Math.min(5000, pw + bump);
+    renderHumOnce(krnText, transposeStr, { pageWidth: pw });
+    const newW = svgIntrinsicWidthPx();
+    if (newW <= w + 1) break; // stalled
+    w = newW;
+    if (w > hardMax) break;
+    tries++;
+  }
+
+  // 4) final clamp down if we overshot
+  tries = 0;
+  w = svgIntrinsicWidthPx();
+  while (w > hardMax && tries < 8){
+    pw = Math.max(320, Math.floor(pw * 0.96));
+    renderHumOnce(krnText, transposeStr, { pageWidth: pw });
+    w = svgIntrinsicWidthPx();
+    tries++;
+  }
+
+  lastGoodPageWidth = pw;
+}
+
+/* Light debounce helper for resize events */
+function debounce(fn, delay = 150){
+  let t = null;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+}
+
+// Fit-to-viewer render (like Boyvin)
 function renderWithVerovio(krnText, tonicForRender){
   try {
-    const { scale, spacingLinear } = getCurrentScaleSpacing();
-    // If currentRenderSemitoneShift is non-zero, prefer numeric transpose string; otherwise send spelled tonic.
-    let verovioTonic = '';
-    if (currentRenderSemitoneShift && !isNaN(Number(currentRenderSemitoneShift))) {
-      verovioTonic = String(Number(currentRenderSemitoneShift));
-      lastRenderTranspose = verovioTonic;
-    } else {
-      verovioTonic = tonicForRender ? tonicToVerovioAscii(String(tonicForRender)) : '';
-      lastRenderTranspose = verovioTonic || '';
-    }
-    if (vrv) {
-      vrv.setOptions({ ...baseOptions, scale: Number(scale), spacingLinear: Number(spacingLinear), transpose: verovioTonic });
-      const svg = vrv.renderData(krnText || '', {});
-      svgHost.innerHTML = svg;
-    } else {
-      svgHost.textContent = '(verovio not initialized) — preview disabled';
-    }
+    // Prefer numeric transpose when octave shifting; otherwise the spelled tonic
+    const transposeParam =
+      (currentRenderSemitoneShift && !isNaN(Number(currentRenderSemitoneShift)))
+        ? String(Number(currentRenderSemitoneShift))
+        : (tonicForRender ? tonicToVerovioAscii(String(tonicForRender)) : '');
+
+    // Run the iterative pageWidth fitting loop
+    fitPageWidthToViewerHum(krnText || '', transposeParam);
   } catch (e) {
     svgHost.textContent = 'Render failed: ' + (e?.message || e);
-    traceLog('renderWithVerovio error: ' + (e?.message || e));
+    traceLog && traceLog('renderWithVerovio error: ' + (e?.message || e));
+  } finally {
+    lastRenderReason = "other";
   }
 }
 
@@ -1843,6 +1993,14 @@ if (tpToggle) tpToggle.addEventListener('click', () => {
   tpToggle.classList.toggle('active', transposePreferFlats);
 });
 
+// Refit on viewport resize (phone rotation, split view, etc.)
+window.addEventListener('resize', debounce(() => {
+  lastRenderReason = "resize";
+  lastGoodPageWidth = null;  // force recompute
+  if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic || '');
+}, 150));
+
+
 // -------------------- Octave buttons (render-only numeric transpose) --------------------
 function applyRenderSemitoneShift(delta){
   // accumulate numeric render shifts (12 per octave)
@@ -2037,7 +2195,7 @@ if (scalePlus) scalePlus.addEventListener('click', ()=>{ scaleSlider.value = Mat
 if (scaleReset) scaleReset.addEventListener('click', ()=>{ scaleSlider.value = 50; updateScaleValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
 
 if (spacingMinus) spacingMinus.addEventListener('click', ()=>{ spacingSlider.value = Math.max(10, Number(spacingSlider.value)-1); updateSpacingValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
-if (spacingPlus) spacingPlus.addEventListener('click', ()=>{ spacingSlider.value = Math.min(80, Number(spacingSlider.value)+1); updateSpacingValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
+if (spacingPlus) spacingPlus.addEventListener('click', ()=>{ spacingSlider.value = Math.min(120, Number(spacingSlider.value)+1); updateSpacingValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
 if (spacingReset) spacingReset.addEventListener('click', ()=>{ spacingSlider.value = 32; updateSpacingValueDisplay(); if (currentKrn) renderWithVerovio(currentKrn, lastTargetTonic); else renderWithVerovio(sample, ''); });
 
 // -------------------- Misc UI placeholders --------------------
