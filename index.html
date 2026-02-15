@@ -1,4 +1,5 @@
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -70,6 +71,24 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 /* ======= Viewer ======= */
 #viewer{ margin-top:8px; }
 
+/* Tagline image under the viewer */
+#modeTagline img.tagline-img {
+  max-height: 66px;     /* adjust if you want larger/smaller */
+  height: auto;
+  display: block;
+  margin: 6px 0 0 0;   /* left-justified (no auto-centering) */
+}
+
+/* Keep historical text in DOM (for JS to touch) but invisible */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+}
 /* ======= Row 3: Key Range + Scale + Spacing (no outer big card) ======= */
 .key-grid{
   display:flex;flex-wrap:nowrap;gap:6px;
@@ -145,18 +164,19 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     <div class="title-badges" id="titlePills" aria-hidden="false" style="margin-left:6px">
       <div class="title-pill" id="titlePill">No title <small id="titleSub"></small></div>
       <div class="title-pill" id="keyPill"><span id="keyPillValue">original</span></div>
+       <strong style="font-weight:700">Created for the University of Iowa Organ Studio</strong>
     </div>
     <div class="spacer"></div>
   </header>
 
   <!-- ===== Row 2: Music viewer ===== -->
   <div id="viewer" class="card" style="margin-top:8px">
-    <div id="svg">Waiting for Verovio…</div>
-    <div id="modeTagline" class="small" style="margin-top:8px">
-      Created for the University of Iowa Organ Studio
-      <span id="historicalStatus" style="margin-left:12px;color:var(--muted)">Historical=TRUE</span>
-    </div>
+  <div id="svg">Waiting for Verovio…</div>
+  <div id="modeTagline" class="small" style="margin-top:8px">
+    <img class="tagline-img" src="./emanuel.png" alt="C. P. E. Bach wordmark">
+    <span id="historicalStatus" class="visually-hidden"></span>
   </div>
+</div>
 
   <!-- ===== Row 3: Key Range + Scale + Spacing (NO big card) ===== -->
   <div class="line" id="row3">
@@ -1474,18 +1494,26 @@ function renderWithVerovio(krnText, tonicForRender){
 }
 
 // -------------------- Pipeline --------------------
+// -------------------- Pipeline --------------------
 function runPipelineForEntry(entry, tonic, m){
   const originalAbsolute = entry.text;
 
-  // Modern override
+  // Prepare a working copy first
   let prepared = entry.text;
+
+  // Modern override (if on)
   if (ACC_MODE === 'modern') {
     prepared = applyModernOverride(prepared);
-    modeTagline.innerHTML = 'Created for the University of Iowa Organ Studio';
-  } else {
-    modeTagline.innerHTML = 'Created for the University of Iowa Organ Studio';
   }
-  historicalStatus.textContent = `Historical=${ACC_MODE==='historic' ? 'TRUE' : 'FALSE'}`;
+
+  // Always show the image tagline + a hidden historical span
+  modeTagline.innerHTML =
+    '<img src="./emanuel.png" alt="Carl Philipp Emanuel Bach" class="tagline-img">' +
+    '<span id="historicalStatus" class="visually-hidden"></span>';
+
+  // Re-query the fresh span (the old const points to a removed node after innerHTML)
+  const hs = document.getElementById('historicalStatus');
+  if (hs) hs.textContent = `Historical=${ACC_MODE==='historic' ? 'TRUE' : 'FALSE'}`;
 
   // Courtesy
   const { text: withCourtesy, conflicts } = applyCourtesyFromSpine4(prepared);
@@ -1698,13 +1726,18 @@ accRadios.forEach(r => {
     ACC_MODE = r.value === 'modern' ? 'modern' : 'historic';
     updateAccLabelVisuals();
     traceLog(`Accidentals mode changed => ${ACC_MODE}`);
+
     if (currentEntry && lastTargetTonic && lastTargetMode) {
       runPipelineForEntry(currentEntry, lastTargetTonic, lastTargetMode);
     } else {
-      modeTagline.innerHTML = (ACC_MODE === 'modern')
-        ? 'Created for the University of Iowa Organ Studio'
-        : 'Created for the University of Iowa Organ Studio';
-      historicalStatus.textContent = `Historical=${ACC_MODE==='historic' ? 'TRUE' : 'FALSE'}`;
+      // Keep the image tagline and add a fresh hidden span
+      modeTagline.innerHTML =
+        '<img src="./emanuel.png" alt="Carl Philipp Emanuel Bach" class="tagline-img">' +
+        '<span id="historicalStatus" class="visually-hidden"></span>';
+
+      // Write to the new span
+      const hs = document.getElementById('historicalStatus');
+      if (hs) hs.textContent = `Historical=${ACC_MODE==='historic' ? 'TRUE' : 'FALSE'}`;
     }
   });
 });
