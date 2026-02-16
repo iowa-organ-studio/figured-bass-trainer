@@ -11,17 +11,34 @@
 <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-hum.js"></script>
 <style>
 :root{
-  --bg:#f7f7f9;
-  --card:#fff;
-  --border:#e6e6ea;
-  --ink:#111;
-  --muted:#666;
-  --gold:#FFCD00;
-  --gold-ink:#2b2000;
-  --butter:#FFEFAD;
-  --grey:#e4e4e7;
-  --accent-green:#1f7a4b;
+
+  /* Backgrounds — parchment grey with cool undertone */
+  --bg: #f3f2ed;         /* cool aged parchment */
+  --card: #ffffff;       /* clean, quiet neutral */
+  --border: #d6d3cf;     /* silver parchment edge */
+
+  /* Text & ink */
+  --ink: #1b1b1f;        /* iron-gall / printing ink */
+  --muted: #4b4d53;      /* cool faded ink */
+
+  /* Silver & pewter tones */
+  --silver: #d6d3cf;     /* light brocade silver */
+  --pewter: #b7b4b0;     /* mid-tone pewter */
+
+  /* Selected/toggled state — cool, readable, noticeable */
+  --selected-bg:     #c4ccd9;  /* muted silver-blue highlight */
+  --selected-border: #808899;  /* blue-grey outline */
+  --selected-ink:    #1b1b1f;  /* ink-black text */
+
+  /* Neutral grey for unselected chips */
+  --grey: #e2e0da;    /* soft warm-grey for chip bases */
+
+  /* Compatibility for old rules */
+  --butter:   var(--selected-bg);
+  --gold:     var(--selected-border);
+  --gold-ink: var(--selected-ink);
 }
+
 html,body{height:100%}
 body{
   font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;
@@ -49,6 +66,15 @@ header {
   align-items: center;
   gap: 8px;              /* optional spacing between items */
   padding: 8px 12px;     /* adjust to match your layout */
+}
+
+/* Right-align the studio credit pill in the header */
+.studio-credit-pill {
+  margin-left: auto;       /* pushes this pill to the far right in the header flex row */
+  white-space: nowrap;     /* keep it on one line if possible */
+  font-weight: 600;        /* same visual weight as the other pills */
+  display: inline-flex;    /* keeps vertical centering consistent */
+  align-items: center;
 }
 
 /* Push the studio credit to the far right */
@@ -80,7 +106,17 @@ header {
   padding:4px 8px;border-radius:999px;border:1px solid var(--grey);
   background:var(--grey);color:#222;cursor:pointer;font-size:.82rem;line-height:1
 }
-.btn.selected{background:var(--butter);border-color:var(--gold);color:var(--gold-ink)}
+/* Selected / toggled states across the app (chips, radios, etc.) */
+.btn.selected,
+.level-btn.toggled,
+.level-btn.selected,
+.include-btn.toggled,
+.radio-inline label.selected,
+[data-role="show"] .level-btn.toggled {
+  background: var(--selected-bg);
+  border-color: var(--selected-border);
+  color: var(--selected-ink);
+}
 
 /* Make the select all/none buttons black (not grey) */
 #selectAllKeys, #selectNoneKeys, #includeSelectAll, #includeSelectNone { color: var(--ink); background: #fff; border-color: var(--border); font-weight:600; }
@@ -97,8 +133,44 @@ header {
 
 /* ======= Row 1 ======= */
 .new-bass-btn{
-  padding:8px 12px;border-radius:999px;border:1px solid #e6b800;background:var(--gold);
-  color:var(--gold-ink);font-weight:600;cursor:pointer
+  padding:8px 14px;
+  border-radius:999px;
+
+  background: linear-gradient(
+    to bottom,
+    #2e3137,
+    #1b1b1f
+  ); /* charcoal → ink-black */
+  color:#ffffff;
+
+  border:1px solid #0f1012; 
+  font-weight:600;
+  cursor:pointer;
+
+  box-shadow:
+    0 1px 0 rgba(0,0,0,0.4),
+    0 6px 12px rgba(0,0,0,0.25);
+
+  transition:0.15s ease;
+}
+
+.new-bass-btn:hover{
+  background: linear-gradient(to bottom, #353941, #1b1b1f);
+  transform: translateY(-1px);
+}
+
+.new-bass-btn:active{
+  background: linear-gradient(to bottom, #1b1b1f, #141417);
+  transform: translateY(1px);
+}
+
+#keyPill .key-label {
+  font-weight: 700;      /* bold label */
+  margin-right: 4px;
+}
+
+#keyPill #keyPillValue {
+  font-weight: 400;      /* normal-weight key name */
 }
 
 /* ======= Viewer ======= */
@@ -218,11 +290,36 @@ input[type="radio"] { accent-color: var(--gold); }
   margin-left: auto;
   margin-right: auto;
 }
+
+/* Unified selected state for all chips/buttons */
+.key-btn.selected,
+.include-btn.toggled,
+.btn.selected,
+.level-btn.toggled,
+.radio-inline label.selected,
+[data-role="show"] .level-btn.toggled {
+  background: var(--selected-bg) !important;
+  border-color: var(--selected-border) !important;
+  color: var(--selected-ink) !important;
+}
+
+/* Base state: soft silver-grey, not white */
+.key-btn,
+.include-btn,
+.level-btn,
+.btn,
+.radio-inline label {
+  background: var(--grey);
+  border-color: var(--border);
+  color: var(--ink);
+}
+
+
 </style>
 </head>
 <body>
 
-<div class="card">
+
   <!-- ===== Row 1: New Bass Line, Title, Key ===== -->
    <!-- ===== Row 1: New Bass Line, Title, Key ===== -->
   <header>
@@ -230,12 +327,17 @@ input[type="radio"] { accent-color: var(--gold); }
 
     <div class="title-badges" id="titlePills" aria-hidden="false" style="margin-left:6px">
       <div class="title-pill" id="titlePill">No title <small id="titleSub"></small></div>
-      <div class="title-pill" id="keyPill"><span id="keyPillValue">original</span></div>
+      <div class="title-pill" id="keyPill">
+  <span class="key-label">Current key:</span>
+  <span id="keyPillValue"></span>
+</div>
       <!-- NOTE: the studio credit was removed from here -->
     </div>
 
     <!-- Studio credit moved outside the title-badges so it can be pushed to the far right -->
-    <strong class="studio-credit">Created for the University of Iowa Organ Studio</strong>
+    <div class="title-pill studio-credit-pill">
+  Created for the University of Iowa Organ Studio
+</div>
   </header>
 
 
@@ -396,7 +498,7 @@ input[type="radio"] { accent-color: var(--gold); }
     <label class="small" style="margin-top:6px;display:block">Trace output (copy &amp; paste here):</label>
     <div id="tracePanel" class="card" style="margin-top:6px;white-space:pre-wrap;font-family:monospace">(trace disabled)</div>
   </div>
-</div>
+
 
 <!-- Logo directly after filters -->
 <div id="logoAfterFilters" aria-label="University of Iowa Organ Studio logo">
