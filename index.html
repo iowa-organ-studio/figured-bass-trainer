@@ -1,5 +1,6 @@
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -423,12 +424,15 @@ input[type="radio"] { accent-color: var(--gold); }
     </div>
 
     <div class="group" data-role="mode">
-      <div class="small">Mode:</div>
-      <div id="modeRow" style="display:flex;gap:6px">
-        <button class="btn" data-filter="mode" data-value="major">Major</button>
-        <button class="btn" data-filter="mode" data-value="minor">Minor</button>
-      </div>
-    </div>
+  <div class="small">Mode:</div>
+  <div id="modeRow" style="display:flex;gap:6px">
+    <button class="btn" data-filter="mode" data-value="major">Major</button>
+    <button class="btn" data-filter="mode" data-value="minor">Minor</button>
+    <!-- NEW -->
+    <button class="btn" data-filter="mode" data-value="chromatic">Chromatic</button>
+    <button class="btn" data-filter="mode" data-value="pedal">Pedal Point</button>
+  </div>
+</div>
 
     <div class="group" data-role="level">
       <div class="small">Lvl:</div>
@@ -647,10 +651,18 @@ let catalog = [];
     btn.classList.add('selected');
   });
 
-  // Mode
-  document.querySelectorAll('#modeRow .btn').forEach(btn => {
-    btn.classList.add('selected');
-  });
+  // Mode — default ON for Major/Minor; OFF for Chromatic/Pedal
+document.querySelectorAll('#modeRow .btn').forEach(btn => {
+  const v = btn.dataset.value;
+  const on = (v === 'major' || v === 'minor');
+  if (on) btn.classList.add('selected'); else btn.classList.remove('selected');
+});
+
+// Mode
+Array.from(document.querySelectorAll('#modeRow .btn')).forEach(b => {
+  const v = b.dataset.value;
+  if (v) selected.mode.add(v);
+});
 
   // Level 1–7
   document.querySelectorAll('#diffRow .btn').forEach(btn => {
@@ -1509,35 +1521,57 @@ async function fetchText(path){
 }
 function metaFromHeader(krn){
   const lines = krn.split(/\r?\n/).slice(0, 120);
-  let dir = null, diff = null, title = null, mode = null;
+  let dir = null, category = null, title = null, diff = null;
+
+  // Try to detect key-mode (major/minor) from the key token: *C: vs *a:
+  let keyMode = null;
+  const keyMatch = krn.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m);
+  if (keyMatch) {
+    keyMode = (keyMatch[1] === keyMatch[1].toUpperCase()) ? 'major' : 'minor';
+  }
+
   for (const ln of lines){
     const s = (ln||'').trim();
     if (!s || !s.startsWith('!!')) continue;
+
     const titleMatch = s.match(/^!!\s*(?:Title|T)\s+(.*)$/i);
-    if (titleMatch && titleMatch[1] && !title){
+    if (titleMatch && titleMatch[1] && !title) {
       title = titleMatch[1].trim();
       continue;
     }
+
     const numMatch = s.match(/^!!\s*Number\s+(\d+)\s*$/i);
-    if (numMatch && numMatch[1]){
+    if (numMatch && numMatch[1]) {
       diff = parseInt(numMatch[1], 10);
       continue;
     }
+
     const dirLine = s.match(/^!!\s*Dir\b(.*)$/i);
     if (dirLine){
-      const rest = dirLine[1];
+      const rest = (dirLine[1] || '').trim();
+
+      // Direction
       if (/ascending/i.test(rest)) dir = 'ascending';
       if (/descending/i.test(rest)) dir = 'descending';
-      if (/major/i.test(rest)) mode = 'major';
-      if (/minor/i.test(rest)) mode = 'minor';
+
+      // Category detection (new)
+      if (/chromatic/i.test(rest)) {
+        category = 'chromatic';
+      } else if (/pedal\s*point/i.test(rest)) {
+        category = 'pedal';
+      } else {
+        // Legacy detection for major/minor in the Dir line
+        if (/major/i.test(rest)) category = 'major';
+        if (/minor/i.test(rest)) category = 'minor';
+      }
       continue;
     }
   }
-  if (!mode) {
-    const m = krn.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m);
-    if (m) mode = (m[1] === m[1].toUpperCase()) ? 'major' : 'minor';
-  }
-  return { dir, mode, diff, title };
+
+  // If no category was found in Dir line, fall back to key-mode
+  if (!category) category = keyMode || 'major';
+
+  return { dir, mode: category, keyMode, diff, title };
 }
 async function buildCatalog(paths, concurrency=4){
   catalog = [];
@@ -1551,12 +1585,21 @@ async function buildCatalog(paths, concurrency=4){
       try {
         const { path, text } = await fetchText(raw);
         const meta = metaFromHeader(text);
-        results.push({ path, dir: meta.dir, mode: meta.mode, diff: meta.diff, title: meta.title, text });
+results.push({
+  path,
+  dir: meta.dir,
+  mode: meta.mode,         // filter category: 'major'|'minor'|'chromatic'|'pedal'
+  keyMode: meta.keyMode,   // actual key-mode: 'major'|'minor' (from *C:/*a:)
+  diff: meta.diff,
+  title: meta.title,
+  text
+});
       } catch(e){ /* skip */ }
     }
   }
   await Promise.all(Array.from({length:concurrency}, worker));
-  catalog = results;
+// Defensive: ensure no holes/undefined got in (shouldn’t happen, but safe)
+catalog = results.filter(Boolean);
   if (totalCount) totalCount.textContent = String(catalog.length);
   updateMatchCount();
 }
@@ -1564,6 +1607,9 @@ async function buildCatalog(paths, concurrency=4){
 function pickRandom(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
 
 function matchesFilters(item){
+  // Defensive: skip falsy catalog entries (avoids "reading 'mode' of undefined")
+  if (!item) return false;
+
   if (selected.dir.size){
     if (!item.dir || !selected.dir.has(item.dir)) return false;
   }
@@ -2053,7 +2099,8 @@ function setTargetTonic(tonic){
   if (!currentEntry) { traceLog('setTargetTonic: no current entry'); return; }
   const t = normalizeTonicForHumdrum(tonic);
   lastTargetTonic = t;
-  lastTargetMode = lastTargetMode || currentEntry.mode || 'major';
+  // Use true key-mode (major/minor), not the category label (chromatic/pedal)
+  lastTargetMode = lastTargetMode || currentEntry.keyMode || 'major';
   currentRenderSemitoneShift = 0;
   runPipelineForEntry(currentEntry, t, lastTargetMode);
 }
@@ -2242,31 +2289,48 @@ if (clearBtn) {
 
 // -------------------- Sample / Random wiring (UPDATED to respect include spelled-tonics) ----
 randomBtn.addEventListener('click', async () => {
-  const pick = catalog.length ? pickRandom(currentMatches()) : { path:'sample', text: sample, dir:'descending', mode:'major', diff:1, title:'Sample' };
+  // Pick from filtered catalog, or fall back to sample
+  const pick = catalog.length
+    ? pickRandom(currentMatches())
+    : { path:'sample', text: sample, dir:'descending', mode:'major', keyMode:'major', diff:1, title:'Sample' };
+
   currentEntry = pick;
-  const m = pick.mode || (pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1] === pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1]?.toUpperCase() ? 'major' : 'minor') || 'major';
 
-  // Use effective allowed tonics (if include toned selected, they filter the candidates)
-  const allowedTonics = getEffectiveAllowedTonicsForMode(m);
-  traceLog(`Allowed tonics for mode=${m}: ${JSON.stringify(allowedTonics)}`);
+  // Category for UI (may be 'chromatic' or 'pedal' in addition to 'major'/'minor')
+  const mCategory = pick.mode || 'major';
 
- if (!allowedTonics.length){
-  const msg = 'No allowed keys selected for this mode. Enable one or more key-range buttons (0..7) or choose Include keys.';
-  setStatus(msg, true);
-  traceLog('ERROR: ' + msg);
-  updatePillsFromCatalogEntry(pick);
-  updateKeyPill('', m);
-  humPanel.textContent = '##original\n' + suppressThirdFourthSpinesAfterKey(pick.text) + '\n\n##transposed to [none]\n';
-  return;
-}
+  // True key-mode (major/minor) from key token for tonic/key-range logic
+  const mForTonics =
+    pick.keyMode ||
+    ((pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1] ===
+      pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1]?.toUpperCase())
+      ? 'major'
+      : 'minor') || 'major';
 
+  // Use effective allowed tonics (Include-grid and Key-Range) based on true key-mode
+  const allowedTonics = getEffectiveAllowedTonicsForMode(mForTonics);
+  traceLog(`Allowed tonics for key-mode=${mForTonics}: ${JSON.stringify(allowedTonics)}`);
+
+  if (!allowedTonics.length){
+    const msg = 'No allowed keys selected for this mode. Enable one or more key-range buttons (0..7) or choose Include keys.';
+    setStatus(msg, true);
+    traceLog('ERROR: ' + msg);
+    // Title uses category for readability; key pill shows no target key
+    updatePillsFromCatalogEntry(pick);
+    updateKeyPill('', mForTonics);
+    humPanel.textContent = '##original\n' + suppressThirdFourthSpinesAfterKey(pick.text) + '\n\n##transposed to [none]\n';
+    return;
+  }
+
+  // Choose a target tonic within the allowed set
   const tonic = normalizeTonicForHumdrum(pickRandom(allowedTonics));
   lastTargetTonic = tonic;
-  lastTargetMode = m;
+  lastTargetMode  = mForTonics;
 
-  updatePillsFromCatalogEntry(pick);
-  updateKeyPill(tonic || '', m);
-  runPipelineForEntry(pick, tonic, m);
+  // Update UI and run pipeline
+  updatePillsFromCatalogEntry(pick);        // shows "Ascending Chromatic ..." etc, based on category
+  updateKeyPill(tonic || '', mForTonics);   // key pill always shows Major/Minor
+  runPipelineForEntry(pick, tonic, mForTonics);
 });
 
 // -------------------- Scale / Spacing wiring --------------------
