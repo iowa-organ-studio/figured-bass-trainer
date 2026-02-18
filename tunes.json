@@ -1,5 +1,6 @@
 [
   "tunes/cpe_asc_chrom_1.krn",
+  "tunes/cpe_asc_chrom_2.krn",
   "tunes/cpe_asc_maj_1.krn",
   "tunes/cpe_asc_maj_2.krn",
   "tunes/cpe_asc_maj_3.krn",
@@ -13,6 +14,8 @@
   "tunes/cpe_asc_min_4.krn",
   "tunes/cpe_asc_min_5.krn",
   "tunes/cpe_asc_min_6.krn",
+  "tunes/cpe_desc_chrom_1.krn",
+  "tunes/cpe_desc_chrom_2.krn",
   "tunes/cpe_desc_maj_1.krn",
   "tunes/cpe_desc_maj_2.krn",
   "tunes/cpe_desc_maj_3.krn",
