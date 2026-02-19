@@ -1,0 +1,19 @@
+**kern	**fb	**text	**text
+!!		actual acc.	force diatonic accidental
+!! Dir	Modulating
+!! Title	Rule of the Octave
+!! Number	2
+*clefF4	*	*	*
+*k[]	*k[]	*k[]	*k[]
+*C:	*C:	*C:	*C:
+=1	=1	=1	=1
+4C	.	.	.
+4C#	7- 5-	7- 5n	.
+4D	.	.	.
+4D	6-	.	.
+4D#	7n 5-	7n 5n	.
+4E	6 4	.	.
+4EE	5 #	.	.
+2AA	.	.	.
+=|	=|	=|	=|
+*-	*-	*-	*-
