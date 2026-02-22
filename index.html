@@ -1,6 +1,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -425,13 +426,16 @@ input[type="radio"] { accent-color: var(--gold); }
 
     <div class="group" data-role="mode">
   <div class="small">Mode:</div>
-  <div id="modeRow" style="display:flex;gap:6px">
-    <button class="btn" data-filter="mode" data-value="major">Major</button>
-    <button class="btn" data-filter="mode" data-value="minor">Minor</button>
-    <!-- NEW -->
-    <button class="btn" data-filter="mode" data-value="chromatic">Chromatic</button>
-    <button class="btn" data-filter="mode" data-value="pedal">Pedal Point</button>
-  </div>
+  
+<div id="modeRow" style="display:flex;gap:6px">
+   <button class="btn" data-filter="mode" data-value="major">Major</button>
+   <button class="btn" data-filter="mode" data-value="minor">Minor</button>
+   <!-- NEW -->
+   <button class="btn" data-filter="mode" data-value="chromatic">Chromatic</button>
+   <button class="btn" data-filter="mode" data-value="pedal">Pedal Point</button>
+   <button class="btn" data-filter="mode" data-value="modulating">Modulating</button>
+ </div>
+
 </div>
 
     <div class="group" data-role="level">
@@ -645,48 +649,50 @@ const selected = { dir: new Set(), mode: new Set(), diff: new Set() };
 let catalog = [];
 
 // --- DEFAULT SELECTED: Direction, Mode, Level buttons (visual only) ---
+// --- DEFAULT SELECTED: Direction, Mode, Level buttons (visual only) ---
 (function initDefaultFilterSelections(){
-  // Direction
+  // 1) Direction: default ON for Ascending + Descending
   document.querySelectorAll('#dirRow .btn').forEach(btn => {
     btn.classList.add('selected');
   });
 
-  // Mode — default ON for Major/Minor; OFF for Chromatic/Pedal
-document.querySelectorAll('#modeRow .btn').forEach(btn => {
-  const v = btn.dataset.value;
-  const on = (v === 'major' || v === 'minor');
-  if (on) btn.classList.add('selected'); else btn.classList.remove('selected');
-});
+  // 2) Mode (category): default ON for Major/Minor; OFF for Chromatic/Pedal/Modulating
+  document.querySelectorAll('#modeRow .btn').forEach(btn => {
+    const v = btn.dataset.value;
+    const on = (v === 'major' || v === 'minor');
+    if (on) btn.classList.add('selected');
+    else btn.classList.remove('selected');
+  });
 
-// Mode
-Array.from(document.querySelectorAll('#modeRow .btn')).forEach(b => {
-  const v = b.dataset.value;
-  if (v) selected.mode.add(v);
-});
-
-  // Level 1–7
+  // 3) Level: default ON for 1–7
   document.querySelectorAll('#diffRow .btn').forEach(btn => {
     btn.classList.add('selected');
   });
 
-  // Initialize the internal selected sets to match the visual defaults:
-  // Dir
+  // 4) Initialize the internal selected sets to match those visuals
+  selected.dir.clear();
+  selected.mode.clear();
+  selected.diff.clear();
+
+  // Dir: add both
   Array.from(document.querySelectorAll('#dirRow .btn')).forEach(b => {
     const v = b.dataset.value;
     if (v) selected.dir.add(v);
   });
-  // Mode
+
+  // Mode: ONLY add Major/Minor (Chromatic/Pedal/Modulating stay OFF)
   Array.from(document.querySelectorAll('#modeRow .btn')).forEach(b => {
     const v = b.dataset.value;
-    if (v) selected.mode.add(v);
+    if (v === 'major' || v === 'minor') selected.mode.add(v);
   });
-  // Diff
+
+  // Diff: add all 1–7
   Array.from(document.querySelectorAll('#diffRow .btn')).forEach(b => {
     const v = b.dataset.value;
     if (v) selected.diff.add(v);
   });
 
-  // Update counts initially
+  // 5) Initial count
   updateMatchCount();
 })();
 
@@ -1519,19 +1525,19 @@ async function fetchText(path){
   const t = await r.text();
   return { path: p, text: t };
 }
-function metaFromHeader(krn){
+function metaFromHeader(krn) {
   const lines = krn.split(/\r?\n/).slice(0, 120);
   let dir = null, category = null, title = null, diff = null;
 
-  // Try to detect key-mode (major/minor) from the key token: *C: vs *a:
+  // Detect true key-mode (major/minor) from the key token: *C: vs *a:
   let keyMode = null;
   const keyMatch = krn.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m);
   if (keyMatch) {
     keyMode = (keyMatch[1] === keyMatch[1].toUpperCase()) ? 'major' : 'minor';
   }
 
-  for (const ln of lines){
-    const s = (ln||'').trim();
+  for (const ln of lines) {
+    const s = (ln || '').trim();
     if (!s || !s.startsWith('!!')) continue;
 
     const titleMatch = s.match(/^!!\s*(?:Title|T)\s+(.*)$/i);
@@ -1547,15 +1553,17 @@ function metaFromHeader(krn){
     }
 
     const dirLine = s.match(/^!!\s*Dir\b(.*)$/i);
-    if (dirLine){
+    if (dirLine) {
       const rest = (dirLine[1] || '').trim();
 
       // Direction
       if (/ascending/i.test(rest)) dir = 'ascending';
       if (/descending/i.test(rest)) dir = 'descending';
 
-      // Category detection (new)
-      if (/chromatic/i.test(rest)) {
+      // Category detection
+      if (/modulating/i.test(rest)) {
+        category = 'modulating';
+      } else if (/chromatic/i.test(rest)) {
         category = 'chromatic';
       } else if (/pedal\s*point/i.test(rest)) {
         category = 'pedal';
@@ -1607,15 +1615,23 @@ catalog = results.filter(Boolean);
 function pickRandom(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
 
 function matchesFilters(item){
-  // Defensive: skip falsy catalog entries (avoids "reading 'mode' of undefined")
-  if (!item) return false;
+  // Defensive: skip non-objects
+  if (!item || typeof item !== 'object') return false;
 
+  // Dir: only enforce when the tune actually carries a direction (ascending/descending).
+  // Non-directional categories (modulating, pedal) will have no 'dir' — allow them through.
   if (selected.dir.size){
-    if (!item.dir || !selected.dir.has(item.dir)) return false;
+    if (item.dir) {
+      if (!selected.dir.has(item.dir)) return false;
+    }
+    // If item.dir is missing, do not filter out.
   }
+
+  // Mode = category: 'major'|'minor'|'chromatic'|'pedal'|'modulating'
   if (selected.mode.size){
     if (!item.mode || !selected.mode.has(item.mode)) return false;
   }
+
   if (selected.diff.size){
     const d = String(item.diff ?? '');
     if (!selected.diff.has(d)) return false;
