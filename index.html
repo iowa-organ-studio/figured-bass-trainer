@@ -2,6 +2,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -316,6 +317,23 @@ input[type="radio"] { accent-color: var(--gold); }
   color: var(--ink);
 }
 
+/* ===== Scoreboard ===== */
+#scoreTable { width: 100%; border-collapse: collapse; }
+#scoreTable th, #scoreTable td {
+  border: 1px solid var(--border);
+  padding: 4px 6px;
+  font-size: .82rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+#scoreTable thead th {
+  background: var(--card);
+}
+#scoreTable th:first-child, #scoreTable td:first-child {
+  text-align: left;
+  white-space: nowrap;
+  font-weight: 700;
+}
 
 </style>
 </head>
@@ -488,6 +506,21 @@ input[type="radio"] { accent-color: var(--gold); }
 
   </div>
 
+<!-- ===== Scoreboard ===== -->
+<div id="scoreboard" class="card" style="margin-top:8px">
+  <div class="row">
+    <div class="small">Scoreboard (keys × titles drawn)</div>
+    <div class="spacer"></div>
+    <button id="scoreReset" class="btn" type="button">Reset</button>
+  </div>
+
+  <div style="overflow-x:auto; margin-top:6px">
+    <table id="scoreTable" aria-label="Scoreboard of keys vs titles">
+      <!-- header and rows are injected by JS -->
+    </table>
+  </div>
+</div>
+
   <!-- ===== Humdrum panel ===== -->
   <label class="small" style="margin-top:8px;display:block">Displayed humdrum / .krn (absolute original shown below):</label>
   <div id="humPanel" class="card" style="margin-top:8px;white-space:pre-wrap;font-family:monospace">(no file loaded)</div>
@@ -544,6 +577,10 @@ const totalCount = document.getElementById('totalCount');
 
 const randomBtn = document.getElementById('randomFiltered');
 const clearBtn = document.getElementById('clearFilters');
+
+// --- SCOREBOARD DOM refs ---
+const scoreTable = document.getElementById('scoreTable');
+const scoreResetBtn = document.getElementById('scoreReset');
 
 const titlePill = document.getElementById('titlePill');
 const keyPillValue= document.getElementById('keyPillValue');
@@ -1745,6 +1782,11 @@ function renderIncludeButtons(){
 }
 renderIncludeButtons();
 
+// How many include bases exist in total (used to decide if "All" is truly all)
+const ALL_BASES_LIST = uniqueTonicBasesFromMaps();
+const ALL_BASES_COUNT = ALL_BASES_LIST.length;
+
+
 function selectAllIncludeTonics(){
   allowedTonicBases.clear();
   const btns = Array.from(includeGridEl.querySelectorAll('.include-btn'));
@@ -1774,28 +1816,31 @@ if (includeSelectNoneBtn) {
 
 // -------------------- Effective allowed tonics (updated) --------------------
 function getEffectiveAllowedTonicsForMode(mode){
-  // If the user selected spelled tonics, filter allowed tonics by these bases.
+  // First build the set from key-range only
   const allowedByCount = buildAllowedTonicsForMode(mode);
-  if (allowedTonicBases.size === 0) return allowedByCount;
 
+  // IMPORTANT: If Include-grid is effectively "All" or "None", do NOT intersect (no restriction)
+  if (allowedTonicBases.size === 0 || allowedTonicBases.size === ALL_BASES_COUNT) {
+    return allowedByCount;
+  }
+
+  // Otherwise, apply the intersection with the selected include bases
   const out = [];
-  // Prepare allowed base specs: {letter, accOrEmpty}
   const allowedSpecs = Array.from(allowedTonicBases).map(b => {
     const letter = b[0].toUpperCase();
     const acc = b.length > 1 ? b.slice(1) : '';
-    return {letter, acc};
+    return { letter, acc };
   });
 
   for (const t of allowedByCount){
     const n = normalizeTonicForHumdrum(t);
     const p = parseTonicString(n);
     if (!p) continue;
-    const candLetter = p.letter; // uppercase
-    const candAcc = p.acc === 'n' ? '' : p.acc; // '' | '#' | '-'
-    // If any allowedSpec matches this candidate:
+    const candLetter = p.letter;                // uppercase
+    const candAcc = p.acc === 'n' ? '' : p.acc; // '', '#', '-'
     for (const spec of allowedSpecs){
       if (candLetter !== spec.letter) continue;
-      const specAcc = spec.acc; // '' | '#' | '-'
+      const specAcc = spec.acc;
       if (specAcc === '') {
         if (candAcc === '') { out.push(t); break; }
       } else {
@@ -2303,6 +2348,216 @@ if (clearBtn) {
   });
 }
 
+// ==========================================================================
+// SCOREBOARD (keys × titles)
+// - Columns: exact order with UPPERCASE majors, lowercase minors.
+// - Rows: "<Dir> <Number>" (e.g., "Ascending 5"), alphabetical, de-duplicated.
+// - Update: once per "New Bass Line" draw.
+// ==========================================================================
+
+// Columns (ASCII internal IDs). We'll render with proper ♯/♭ glyphs in the header.
+const SCORE_COLS_ASCII = [
+  // Majors (UPPERCASE)
+  'C','G','D','A','E','B','F#','C#','F','Bb','Eb','Ab','Db','Gb','Cb',
+  // Minors (lowercase)
+  'a','e','b','f#','c#','g#','d#','a#','d','g','c','f','bb','eb','ab'
+];
+
+// State: Map<rowLabel, Map<colKey, count>>
+const scoreState = new Map();
+
+// Build header and empty body once
+function initScoreboard() {
+  if (!scoreTable) return;
+
+  // Clear table
+  scoreTable.innerHTML = '';
+
+  const thead = document.createElement('thead');
+  const trh = document.createElement('tr');
+
+  // First column = row label
+  const th0 = document.createElement('th');
+  th0.textContent = 'Title (Dir + Num)';
+  trh.appendChild(th0);
+
+  // Key columns with glyphs
+  for (const col of SCORE_COLS_ASCII) {
+    const th = document.createElement('th');
+    th.textContent = asciiKeyToGlyph(col);
+    trh.appendChild(th);
+  }
+  thead.appendChild(trh);
+
+  const tbody = document.createElement('tbody');
+  tbody.id = 'scoreBody';
+
+  scoreTable.appendChild(thead);
+  scoreTable.appendChild(tbody);
+}
+
+function asciiKeyToGlyph(k) {
+  // k like 'F#', 'Bb', 'f#', 'bb' → display with ♯/♭, keep letter case
+  const letter = k.charAt(0);
+  const rest = k.slice(1);
+  return letter + rest.replace(/#/g, '♯').replace(/b/g, '♭');
+}
+
+// Convert our tonic (Humdrum normalization uses '#' and '-' for flats) to
+// an ASCII scoreboard column ID in the correct case for mode.
+function humTonicToScoreAscii(tonic, mode) {
+  if (!tonic) return null;
+  // Normalize humdrum: '--' (dbl flat) → 'bb'; '-' → 'b'; '♯' → '#'; '♭' → 'b'
+  let t = String(tonic).trim()
+    .replace(/--/g, 'bb')
+    .replace(/-/g, 'b')
+    .replace(/\u266f/g, '#')
+    .replace(/\u266d/g, 'b');
+
+  const base = t.charAt(0);       // letter
+  const acc  = t.slice(1);        // accidental part if any
+  const isMinor = (mode === 'minor');
+
+  const candidate = (isMinor ? base.toLowerCase() : base.toUpperCase()) + acc;
+  return SCORE_COLS_ASCII.includes(candidate) ? candidate : null;
+}
+
+// Add one count to the (rowLabel, colKey) cell
+function addScore(rowLabel, colKey) {
+  if (!rowLabel || !colKey) return;
+  if (!scoreState.has(rowLabel)) scoreState.set(rowLabel, new Map());
+  const rowMap = scoreState.get(rowLabel);
+  rowMap.set(colKey, (rowMap.get(colKey) || 0) + 1);
+}
+
+// Re-render the table body in alphabetical row order
+function renderScoreboard() {
+  const tbody = document.getElementById('scoreBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const labels = Array.from(scoreState.keys()).sort((a, b) => a.localeCompare(b));
+
+  for (const label of labels) {
+    const tr = document.createElement('tr');
+
+    const tdLabel = document.createElement('td');
+    tdLabel.textContent = label;
+    tr.appendChild(tdLabel);
+
+    const rowMap = scoreState.get(label) || new Map();
+    for (const col of SCORE_COLS_ASCII) {
+      const td = document.createElement('td');
+      const v = rowMap.get(col) || 0;
+      td.textContent = v ? String(v) : ''; // empty cell if zero
+      tr.appendChild(td);
+    }
+
+    tbody.appendChild(tr);
+  }
+}
+
+// Derive row label from the chosen entry (supports Ascending/Descending Chromatic)
+function rowLabelFromEntry(entry) {
+  // entry.dir: 'ascending' | 'descending' | undefined
+  // entry.mode (category): 'major'|'minor'|'chromatic'|'pedal'|'modulating'
+  // entry.diff: Number from !! Number
+  const category = (entry?.mode || '').toLowerCase();
+  const dir = (entry?.dir || '').toLowerCase();
+  const num = (entry?.diff != null) ? String(entry.diff) : '';
+
+  const cap = (s) => String(s || '').replace(/^\w/, c => c.toUpperCase());
+
+  // 1) Ascending/Descending Chromatic -> "Ascending Chromatic <Num>"
+  if ((dir === 'ascending' || dir === 'descending') && category === 'chromatic') {
+    const parts = [cap(dir), 'Chromatic', num].filter(Boolean);
+    return parts.join(' ');
+  }
+
+  // 2) Non-directional categories (Modulating, Pedal) -> "<Category> <Num>"
+  if (!dir && (category === 'modulating' || category === 'chromatic' || category === 'pedal')) {
+    // If you prefer "Pedal Point" as the label text:
+    const catLabel = (category === 'pedal') ? 'Pedal Point' : cap(category);
+    const parts = [catLabel, num].filter(Boolean);
+    return parts.join(' ');
+  }
+
+  // 3) Normal directional major/minor (or if category missing) -> "Ascending <Num>"
+  if (dir === 'ascending' || dir === 'descending') {
+    const parts = [cap(dir), num].filter(Boolean);
+    return parts.join(' ');
+  }
+
+  // 4) Fallback
+  return num || '(untitled)';
+}
+
+// Public hook: call this right after a draw is finalized
+function updateScoreboardForDraw(entry, tonic, trueMode) {
+  const colKey = humTonicToScoreAscii(tonic, trueMode);
+  if (!colKey) {
+    // Key not in the specified scoreboard columns; silently ignore.
+    return;
+  }
+  const label = rowLabelFromEntry(entry);
+  addScore(label, colKey);
+  renderScoreboard();
+}
+
+// Reset button
+if (scoreResetBtn) {
+  scoreResetBtn.addEventListener('click', () => {
+    scoreState.clear();
+    renderScoreboard();
+  });
+}
+
+// Initialize header + empty body on load
+initScoreboard();
+renderScoreboard();
+
+// --- Collapsible Scoreboard (same chevron behavior as Humdrum panel) ---
+(function initScoreboardCollapsed() {
+  const sbPanelEl = document.getElementById('scoreboard');
+  if (!sbPanelEl) return;
+
+  // Create toggle button (re-use same classes to match the Humdrum toggle)
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'humdrum-toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', 'scoreboard');
+
+  const chev = document.createElement('span');
+  chev.className = 'humdrum-chevron';
+  chev.textContent = '►'; // closed
+
+  const txt = document.createElement('span');
+  txt.textContent = 'Scoreboard — click to open';
+
+  toggle.appendChild(chev);
+  toggle.appendChild(txt);
+
+  // Insert above the scoreboard and start collapsed
+  sbPanelEl.parentNode.insertBefore(toggle, sbPanelEl);
+  sbPanelEl.style.display = 'none';
+
+  toggle.addEventListener('click', () => {
+    const isOpen = sbPanelEl.style.display !== 'none';
+    if (isOpen) {
+      sbPanelEl.style.display = 'none';
+      toggle.setAttribute('aria-expanded', 'false');
+      chev.textContent = '►';
+      txt.textContent = 'Scoreboard — click to open';
+    } else {
+      sbPanelEl.style.display = 'block';
+      toggle.setAttribute('aria-expanded', 'true');
+      chev.textContent = '▼';
+      txt.textContent = 'Scoreboard — click to close';
+    }
+  });
+})();
+
 // -------------------- Sample / Random wiring (UPDATED to respect include spelled-tonics) ----
 randomBtn.addEventListener('click', async () => {
   // Pick from filtered catalog, or fall back to sample
@@ -2327,6 +2582,13 @@ randomBtn.addEventListener('click', async () => {
   const allowedTonics = getEffectiveAllowedTonicsForMode(mForTonics);
   traceLog(`Allowed tonics for key-mode=${mForTonics}: ${JSON.stringify(allowedTonics)}`);
 
+// DEBUG: show what the pool looks like **before** picking
+traceLog(
+  `POOL targetMode=${mForTonics} ` + // or targetMode if you applied my earlier patch
+  `counts=[${Array.from(enabledCounts).sort((a,b)=>a-b).join(',')}] ` +
+  `allowedTonics=${JSON.stringify(allowedTonics)}`
+);
+
   if (!allowedTonics.length){
     const msg = 'No allowed keys selected for this mode. Enable one or more key-range buttons (0..7) or choose Include keys.';
     setStatus(msg, true);
@@ -2347,6 +2609,7 @@ randomBtn.addEventListener('click', async () => {
   updatePillsFromCatalogEntry(pick);        // shows "Ascending Chromatic ..." etc, based on category
   updateKeyPill(tonic || '', mForTonics);   // key pill always shows Major/Minor
   runPipelineForEntry(pick, tonic, mForTonics);
+  updateScoreboardForDraw(pick, tonic, mForTonics);
 });
 
 // -------------------- Scale / Spacing wiring --------------------
