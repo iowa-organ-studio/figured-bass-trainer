@@ -335,6 +335,17 @@ input[type="radio"] { accent-color: var(--gold); }
   font-weight: 700;
 }
 
+  /* === Scoreboard totals styling === */
+#scoreTable tr.totals-row th,
+#scoreTable tr.totals-row td {
+  font-style: italic;
+}
+
+#scoreTable th.totals-col,
+#scoreTable td.totals-col {
+  font-style: italic;
+}
+  
 </style>
 </head>
 <body>
@@ -2367,6 +2378,8 @@ const SCORE_COLS_ASCII = [
 const scoreState = new Map();
 
 // Build header and empty body once
+
+// Build header (adds a permanent "totals" column header right of the title column)
 function initScoreboard() {
   if (!scoreTable) return;
 
@@ -2380,6 +2393,12 @@ function initScoreboard() {
   const th0 = document.createElement('th');
   th0.textContent = 'Title (Dir + Num)';
   trh.appendChild(th0);
+
+  // NEW: Totals column header (italic)
+  const thTotals = document.createElement('th');
+  thTotals.textContent = 'totals';
+  thTotals.className = 'totals-col';
+  trh.appendChild(thTotals);
 
   // Key columns with glyphs
   for (const col of SCORE_COLS_ASCII) {
@@ -2395,6 +2414,7 @@ function initScoreboard() {
   scoreTable.appendChild(thead);
   scoreTable.appendChild(tbody);
 }
+
 
 function asciiKeyToGlyph(k) {
   // k like 'F#', 'Bb', 'f#', 'bb' → display with ♯/♭, keep letter case
@@ -2430,7 +2450,9 @@ function addScore(rowLabel, colKey) {
   rowMap.set(colKey, (rowMap.get(colKey) || 0) + 1);
 }
 
-// Re-render the table body in alphabetical row order
+
+// Re-render the body (adds a permanent first data row with column totals,
+// and a permanent second column with per-row totals)
 function renderScoreboard() {
   const tbody = document.getElementById('scoreBody');
   if (!tbody) return;
@@ -2438,24 +2460,76 @@ function renderScoreboard() {
 
   const labels = Array.from(scoreState.keys()).sort((a, b) => a.localeCompare(b));
 
+  // Precompute column totals and row totals
+  const colTotals = new Map(SCORE_COLS_ASCII.map(k => [k, 0]));
+  const rowTotals = new Map();
+
+  for (const label of labels) {
+    const rowMap = scoreState.get(label) || new Map();
+    let rSum = 0;
+    for (const col of SCORE_COLS_ASCII) {
+      const v = rowMap.get(col) || 0;
+      rSum += v;
+      colTotals.set(col, (colTotals.get(col) || 0) + v);
+    }
+    rowTotals.set(label, rSum);
+  }
+
+  // ---- Totals row (first data row, directly underneath the header) ----
+  const trTotals = document.createElement('tr');
+  trTotals.className = 'totals-row';
+
+  // label cell
+  const tdLabel = document.createElement('td');
+  tdLabel.textContent = 'totals';
+  trTotals.appendChild(tdLabel);
+
+  // Totals column cell in the totals row: keep blank (or compute grand total if desired)
+  const tdGrand = document.createElement('td');
+  // If you prefer a grand total at the intersection, uncomment this line:
+  // tdGrand.textContent = Array.from(rowTotals.values()).reduce((a,b)=>a+b,0) || '';
+  tdGrand.textContent = '';
+  tdGrand.className = 'totals-col';
+  trTotals.appendChild(tdGrand);
+
+  // Column totals by key
+  for (const col of SCORE_COLS_ASCII) {
+    const td = document.createElement('td');
+    const v = colTotals.get(col) || 0;
+    td.textContent = v ? String(v) : '';
+    trTotals.appendChild(td);
+  }
+  tbody.appendChild(trTotals);
+
+  // ---- Regular rows (with per-row totals in the 2nd column) ----
   for (const label of labels) {
     const tr = document.createElement('tr');
 
-    const tdLabel = document.createElement('td');
-    tdLabel.textContent = label;
-    tr.appendChild(tdLabel);
+    // Row label
+    const tdL = document.createElement('td');
+    tdL.textContent = label;
+    tr.appendChild(tdL);
 
+    // NEW: totals column for this row
+    const tdRowTotal = document.createElement('td');
+    const rSum = rowTotals.get(label) || 0;
+    tdRowTotal.textContent = rSum ? String(rSum) : '';
+    tdRowTotal.className = 'totals-col';
+    tr.appendChild(tdRowTotal);
+
+    // Key cells
     const rowMap = scoreState.get(label) || new Map();
     for (const col of SCORE_COLS_ASCII) {
       const td = document.createElement('td');
       const v = rowMap.get(col) || 0;
-      td.textContent = v ? String(v) : ''; // empty cell if zero
+      td.textContent = v ? String(v) : '';
       tr.appendChild(td);
     }
 
     tbody.appendChild(tr);
   }
 }
+
 
 // Derive row label from the chosen entry (supports Ascending/Descending Chromatic)
 function rowLabelFromEntry(entry) {
@@ -2680,3 +2754,4 @@ if (!currentKrn) {
 </script>
 </body>
 </html>
+
