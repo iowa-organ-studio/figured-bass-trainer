@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -464,6 +465,7 @@ input[type="radio"] { accent-color: var(--gold); }
    <button class="btn" data-filter="mode" data-value="chromatic">Chromatic</button>
    <button class="btn" data-filter="mode" data-value="pedal">Pedal Point</button>
    <button class="btn" data-filter="mode" data-value="modulating">Modulating</button>
+   <button class="btn" data-filter="mode" data-value="mod-remote">Modulating (remote keys)</button>
  </div>
 
 </div>
@@ -1397,9 +1399,14 @@ function transformFiguresForTonicWithTrace(originalKrn, targetTonic, targetMode)
 
       const newTokens = tokens.map(tok => {
         // Keep-as-is tokens: \d+#\|, numeral ending with / or \, and literal "5-" only in historic mode
-        if (/^\d+#\|$/.test(tok) || /^\d+[\/\\]$/.test(tok) || (ACC_MODE === 'historic' && /^5-$/.test(tok))) {
-          return tok;
-        }
+        // Keep-as-is tokens: \d+#\|, numeral ending with / or \, and literal "5-" or "7-" only in historic mode
+if (
+  /^\d+#\|$/.test(tok) || 
+  /^\d+[\/\\]$/.test(tok) || 
+  (ACC_MODE === 'historic' && /^(5-|7-)$/.test(tok))
+) {
+  return tok;
+}
 
         // Accidental-only (standalone) — refers to diatonic third
         if (/^(--|##|#|-|n)$/.test(tok)) {
@@ -1610,17 +1617,21 @@ function metaFromHeader(krn) {
       if (/descending/i.test(rest)) dir = 'descending';
 
       // Category detection
-      if (/modulating/i.test(rest)) {
-        category = 'modulating';
-      } else if (/chromatic/i.test(rest)) {
-        category = 'chromatic';
-      } else if (/pedal\s*point/i.test(rest)) {
-        category = 'pedal';
-      } else {
-        // Legacy detection for major/minor in the Dir line
-        if (/major/i.test(rest)) category = 'major';
-        if (/minor/i.test(rest)) category = 'minor';
-      }
+     // Category detection
+if (/(remote\s*key\s*modulation|modulation\s*.*remote)/i.test(rest)) {
+  // NEW: explicit "Remote Key Modulation" → our new filter value
+  category = 'mod-remote';
+} else if (/modulating/i.test(rest)) {
+  category = 'modulating';
+} else if (/chromatic/i.test(rest)) {
+  category = 'chromatic';
+} else if (/pedal\s*point/i.test(rest)) {
+  category = 'pedal';
+} else {
+  // Legacy detection for major/minor in the Dir line
+  if (/major/i.test(rest)) category = 'major';
+  if (/minor/i.test(rest)) category = 'minor';
+}
       continue;
     }
   }
@@ -2550,12 +2561,20 @@ function rowLabelFromEntry(entry) {
   }
 
   // 2) Non-directional categories (Modulating, Pedal) -> "<Category> <Num>"
-  if (!dir && (category === 'modulating' || category === 'chromatic' || category === 'pedal')) {
-    // If you prefer "Pedal Point" as the label text:
-    const catLabel = (category === 'pedal') ? 'Pedal Point' : cap(category);
-    const parts = [catLabel, num].filter(Boolean);
-    return parts.join(' ');
+  // 2) Non-directional categories (Modulating, Modulating (remote keys), Chromatic, Pedal)
+if (!dir && (category === 'modulating' || category === 'mod-remote' || category === 'chromatic' || category === 'pedal')) {
+  let catLabel;
+  if (category === 'pedal') {
+    catLabel = 'Pedal Point';
+  } else if (category === 'mod-remote') {
+    catLabel = 'Modulating (remote keys)';
+  } else {
+    catLabel = cap(category);
   }
+  const parts = [catLabel, num].filter(Boolean);
+  return parts.join(' ');
+}
+
 
   // 3) Normal directional major/minor (or if category missing) -> "Ascending <Num>"
   if (dir === 'ascending' || dir === 'descending') {
