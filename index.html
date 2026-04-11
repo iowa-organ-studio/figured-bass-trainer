@@ -767,29 +767,41 @@ function letterStepsUp(fromLetter, steps){ // steps >= 0
 }
 
 // Normalize tonic to Humdrum glyphs ('-', '--', '#', '##', 'n')
+// Normalize tonic to Humdrum glyphs ('-', '--', '#', '##', 'n')
 function normalizeTonicForHumdrum(s) {
   if (!s) return s;
   const raw = String(s).trim();
-  const m = raw.match(/^([A-Ga-g])([#\u266f-]{0,2})?$/);
+  const m = raw.match(/^([A-Ga-g])([#\u266f\u266db-]{0,2})?$/);
   if (!m) return raw;
+
   const letter = m[1];
   let acc = m[2] || '';
+
   acc = acc
     .replace(/\u266f/g, '#')
     .replace(/\u266d/g, '-')
     .replace(/bb/g, '--')
     .replace(/b/g, '-');
+
   return letter + acc;
 }
 
 // Parse tonic string "A", "Ab", "C#", returns {letter, acc, mode}
+// Parse tonic string "A", "Ab", "C#", returns {letter, acc, mode}
 function parseTonicString(s){
   if (!s) return null;
-  const m = String(s).trim().match(/^([A-Ga-g])([#\u266f-]{0,2})$/);
+  const m = String(s).trim().match(/^([A-Ga-g])([#\u266f\u266db-]{0,2})$/);
   if (!m) return null;
+
   let letter = m[1].toUpperCase();
   let acc = (m[2] || '') || 'n';
-  acc = acc.replace(/\u266f/g, '#');
+
+  acc = acc
+    .replace(/\u266f/g, '#')
+    .replace(/\u266d/g, '-')
+    .replace(/bb/g, '--')
+    .replace(/b/g, '-');
+
   if (acc === '') acc = 'n';
   return { letter, acc, mode: (m[1] === m[1].toLowerCase() ? 'minor' : 'major') };
 }
@@ -2774,5 +2786,4 @@ if (!currentKrn) {
 </script>
 </body>
 </html>
-
 
