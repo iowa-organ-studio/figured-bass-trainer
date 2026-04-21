@@ -322,6 +322,16 @@ input[type="radio"] { accent-color: var(--gold); }
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+/* Highlight grand total cell */
+.grand-total-cell {
+  background: var(--selected-bg);
+  border-color: var(--selected-border);
+  color: var(--selected-ink);
+  font-weight: 700;
+  font-style: normal;
+}
+
 #scoreTable thead th {
   background: var(--card);
 }
@@ -342,10 +352,10 @@ input[type="radio"] { accent-color: var(--gold); }
   font-style: italic;
 }
 
-/* Reduce width of the first scoreboard column by 1/3 */
 #scoreTable th:first-child,
 #scoreTable td:first-child {
-  width: 66%;
+  width: auto;
+  white-space: nowrap;
 }
   
 </style>
@@ -462,7 +472,8 @@ input[type="radio"] { accent-color: var(--gold); }
         <button class="btn" data-filter="category" data-value="common-chord">Common Chord</button>
         <button class="btn" data-filter="category" data-value="ascending">Ascending RoO</button>
         <button class="btn" data-filter="category" data-value="descending">Descending RoO</button>
-        <button class="btn" data-filter="category" data-value="chromatic">Chromatic</button>
+        <button class="btn" data-filter="category" data-value="asc-chromatic">Ascending Chromatic RoO</button>
+        <button class="btn" data-filter="category" data-value="desc-chromatic">Descending Chromatic RoO</button>
         <button class="btn" data-filter="category" data-value="pedal">Pedal Point</button>
         <button class="btn" data-filter="category" data-value="modulating">Modulating</button>
         <button class="btn" data-filter="category" data-value="mod-remote">Modulating (Remote Keys)</button>
@@ -689,6 +700,17 @@ const octPlus = document.getElementById('octPlus');
     }
   });
 })();
+
+function pickRandomFromArray(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function chooseTargetKeyMode() {
+  const modes = Array.from(selected.keyMode); // usually major/minor
+  if (!modes.length) return 'major';
+  if (modes.length === 1) return modes[0];
+  return pickRandomFromArray(modes);
+}
 
 // -------------------- Filter state (internal) --------------------
 // -------------------- Filter state (internal) --------------------
@@ -1519,18 +1541,44 @@ function prettyCategoryName(mode) {
   return mode ? String(mode) : '';
 }
 
+function categoryDisplayName(mode) {
+  const m = String(mode || '').toLowerCase();
+  if (m === 'ascending') return 'Ascending';
+  if (m === 'descending') return 'Descending';
+  if (m === 'asc-chromatic') return 'Ascending Chromatic';
+  if (m === 'desc-chromatic') return 'Descending Chromatic';
+  if (m === 'common-chord') return 'Common Chord';
+  if (m === 'chromatic') return 'Chromatic';
+  if (m === 'pedal') return 'Pedal Point';
+  if (m === 'modulating') return 'Modulating';
+  if (m === 'mod-remote') return 'Modulating (Remote Keys)';
+  return mode ? String(mode) : '';
+}
+
 // -------------------- Catalog / filters / UI --------------------
 function updatePillsFromCatalogEntry(entry) {
-  const categoryWord = entry?.mode ? prettyCategoryName(entry.mode) : '';
+  const mode = entry?.mode;
   const lvl = entry?.diff != null ? String(entry.diff) : '';
-  const pieces = [];
+  const keyMode = entry?.keyMode || '';
 
-  if (categoryWord) pieces.push(categoryWord);
-  pieces.push('Rule of the Octave');
-  if (lvl) pieces.push(lvl);
+  let title = '';
 
-  titlePill.innerHTML = escapeHtml(pieces.join(' ') || 'No title');
+  if (mode === 'ascending' || mode === 'descending' || mode === 'asc-chromatic' || mode === 'desc-chromatic') {
+    const dir = categoryDisplayName(mode);
+    const isChrom = mode === 'asc-chromatic' || mode === 'desc-chromatic';
+    title = isChrom
+      ? `${dir} Rule of the Octave ${lvl}`
+      : `${dir} Rule of the Octave ${lvl}`;
+  } else if (mode === 'common-chord') {
+    title = `Common Chord (${keyMode}) ${lvl}`;
+  } else {
+    const categoryWord = categoryDisplayName(mode);
+    title = `${categoryWord ? categoryWord + ' ' : ''}Rule of the Octave ${lvl}`;
+  }
+
+  titlePill.innerHTML = escapeHtml(title.trim() || 'No title');
 }
+
 function formatKeyName(tonic, mode){
   if (!tonic) return 'original';
   const m = String(tonic).trim().match(/^([A-Ga-g])(.+)?$/);
@@ -1634,17 +1682,30 @@ function metaFromHeader(krn, path = '') {
       continue;
     }
 
-    const dirLine = s.match(/^!!\s*Dir\b(.*)$/i);
-    if (dirLine) {
-      const rest = (dirLine[1] || '').trim();
-      if (/common\s*chord/i.test(rest)) category = 'common-chord';
-      else if (/ascending/i.test(rest)) category = 'ascending';
-      else if (/descending/i.test(rest)) category = 'descending';
-      else if (/(remote\s*key\s*modulation|modulation\s*.*remote)/i.test(rest)) category = 'mod-remote';
-      else if (/modulating/i.test(rest)) category = 'modulating';
-      else if (/chromatic/i.test(rest)) category = 'chromatic';
-      else if (/pedal\s*point/i.test(rest)) category = 'pedal';
-    }
+const dirLine = s.match(/^!!\s*Dir\b(.*)$/i);
+if (dirLine) {
+  const rest = (dirLine[1] || '').trim();
+
+  if (/common\s*chord/i.test(rest)) {
+    category = 'common-chord';
+  } else if (/ascending\s+chromatic/i.test(rest)) {
+    category = 'asc-chromatic';
+  } else if (/descending\s+chromatic/i.test(rest)) {
+    category = 'desc-chromatic';
+  } else if (/chromatic/i.test(rest)) {
+    category = 'chromatic';
+  } else if (/pedal\s*point/i.test(rest)) {
+    category = 'pedal';
+  } else if (/remote\s*key\s*modulation|modulation\s*.*remote/i.test(rest)) {
+    category = 'mod-remote';
+  } else if (/modulating/i.test(rest)) {
+    category = 'modulating';
+  } else if (/ascending/i.test(rest)) {
+    category = 'ascending';
+  } else if (/descending/i.test(rest)) {
+    category = 'descending';
+  }
+}
   }
 
   return { keyMode, mode: category, diff, title };
@@ -2515,11 +2576,14 @@ function renderScoreboard() {
 
   // Totals column cell in the totals row: keep blank (or compute grand total if desired)
   const tdGrand = document.createElement('td');
-  // If you prefer a grand total at the intersection, uncomment this line:
-  // tdGrand.textContent = Array.from(rowTotals.values()).reduce((a,b)=>a+b,0) || '';
-  tdGrand.textContent = '';
-  tdGrand.className = 'totals-col';
-  trTotals.appendChild(tdGrand);
+
+const grandTotal = Array.from(rowTotals.values())
+  .reduce((a, b) => a + b, 0);
+
+tdGrand.textContent = grandTotal || '';
+tdGrand.className = 'grand-total-cell';
+
+trTotals.appendChild(tdGrand);
 
   // Column totals by key
   for (const col of SCORE_COLS_ASCII) {
@@ -2566,10 +2630,23 @@ function renderScoreboard() {
 function rowLabelFromEntry(entry) {
   const category = (entry?.mode || '').toLowerCase();
   const num = (entry?.diff != null) ? String(entry.diff) : '';
-  const label = prettyCategoryName(category);
 
+  if (category === 'common-chord') {
+    const keyMode = entry?.keyMode ? ` (${entry.keyMode})` : '';
+    return `Common Chord${keyMode}${num ? ' ' + num : ''}`;
+  }
+
+  if (category === 'asc-chromatic' || category === 'desc-chromatic') {
+    return `${categoryDisplayName(category)} Rule of the Octave${num ? ' ' + num : ''}`;
+  }
+
+  if (category === 'ascending' || category === 'descending') {
+    return `${categoryDisplayName(category)} Rule of the Octave${num ? ' ' + num : ''}`;
+  }
+
+  const label = categoryDisplayName(category);
   if (label) {
-    return [label, num].filter(Boolean).join(' ');
+    return [label, 'Rule of the Octave', num].filter(Boolean).join(' ');
   }
 
   return num || '(untitled)';
@@ -2651,43 +2728,23 @@ randomBtn.addEventListener('click', async () => {
 
   currentEntry = pick;
 
-  // Category for UI (may be 'chromatic' or 'pedal' in addition to 'major'/'minor')
-  const mCategory = pick.mode || 'major';
+  // Target key mode comes from the UI, not from the source .krn
+  const mForTonics = pick.keyMode || inferKeyMode(pick.path, pick.text) || 'major';
 
-  // True key-mode (major/minor) from key token for tonic/key-range logic
-  const inferKeyMode = (pick) => {
-  const path = String(pick?.path || '').toLowerCase();
-  const fname = path.split('/').pop() || '';
-
-  if (/_common_min_/i.test(fname) || /cpe_common_min_/i.test(fname)) return 'minor';
-  if (/_common_maj_/i.test(fname) || /cpe_common_maj_/i.test(fname)) return 'major';
-
-  if (pick?.keyMode === 'major' || pick?.keyMode === 'minor') return pick.keyMode;
-
-  const m = String(pick?.text || '').match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m);
-  if (m) return (m[1] === m[1].toUpperCase()) ? 'major' : 'minor';
-
-  return 'major';
-};
-
-const mForTonics = inferKeyMode(pick);
-
-  // Use effective allowed tonics (Include-grid and Key-Range) based on true key-mode
+  // Use effective allowed tonics (Include-grid and Key-Range) based on chosen target mode
   const allowedTonics = getEffectiveAllowedTonicsForMode(mForTonics);
-  traceLog(`Allowed tonics for key-mode=${mForTonics}: ${JSON.stringify(allowedTonics)}`);
 
-// DEBUG: show what the pool looks like **before** picking
-traceLog(
-  `POOL targetMode=${mForTonics} ` + // or targetMode if you applied my earlier patch
-  `counts=[${Array.from(enabledCounts).sort((a,b)=>a-b).join(',')}] ` +
-  `allowedTonics=${JSON.stringify(allowedTonics)}`
-);
+  traceLog(`Allowed tonics for key-mode=${mForTonics}: ${JSON.stringify(allowedTonics)}`);
+  traceLog(
+    `POOL targetMode=${mForTonics} ` +
+    `counts=[${Array.from(enabledCounts).sort((a,b)=>a-b).join(',')}] ` +
+    `allowedTonics=${JSON.stringify(allowedTonics)}`
+  );
 
   if (!allowedTonics.length){
     const msg = 'No allowed keys selected for this mode. Enable one or more key-range buttons (0..7) or choose Include keys.';
     setStatus(msg, true);
     traceLog('ERROR: ' + msg);
-    // Title uses category for readability; key pill shows no target key
     updatePillsFromCatalogEntry(pick);
     updateKeyPill('', mForTonics);
     humPanel.textContent = '##original\n' + suppressThirdFourthSpinesAfterKey(pick.text) + '\n\n##transposed to [none]\n';
@@ -2700,8 +2757,8 @@ traceLog(
   lastTargetMode  = mForTonics;
 
   // Update UI and run pipeline
-  updatePillsFromCatalogEntry(pick);        // shows "Ascending Chromatic ..." etc, based on category
-  updateKeyPill(tonic || '', mForTonics);   // key pill always shows Major/Minor
+  updatePillsFromCatalogEntry(pick);
+  updateKeyPill(tonic || '', mForTonics);
   runPipelineForEntry(pick, tonic, mForTonics);
   updateScoreboardForDraw(pick, tonic, mForTonics);
 });
