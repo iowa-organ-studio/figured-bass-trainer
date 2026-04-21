@@ -235,8 +235,8 @@ header {
 
 /* ======= Row 4: Filters (no big outer card) ======= */
 /* Hide labels “Dir:”, “Mode:”, “Lvl:” per request */
-.group[data-role="dir"] .small,
-.group[data-role="mode"] .small,
+.group[data-role="key-mode"] .small,
+.group[data-role="category"] .small,
 .group[data-role="level"] .small{ display:none }
 
 /* Accidentals radios styled to look like chips, mutually exclusive by native radio */
@@ -446,29 +446,28 @@ input[type="radio"] { accent-color: var(--gold); }
   </div>
 
   <!-- ===== Row 4: Filters (NO big outer card) ===== -->
+    <!-- ===== Row 4: Filters (NO big outer card) ===== -->
   <div class="line" id="row4">
-    <div class="group" data-role="dir">
-      <div class="small">Dir:</div>
-      <div id="dirRow" style="display:flex;gap:6px">
-        <button class="btn" data-filter="dir" data-value="ascending">Ascending</button>
-        <button class="btn" data-filter="dir" data-value="descending">Descending</button>
+    <div class="group" data-role="key-mode">
+      <div class="small">Key Mode:</div>
+      <div id="keyModeRow" style="display:flex;gap:6px">
+        <button class="btn" data-filter="keyMode" data-value="major">Major</button>
+        <button class="btn" data-filter="keyMode" data-value="minor">Minor</button>
       </div>
     </div>
 
-    <div class="group" data-role="mode">
-  <div class="small">Mode:</div>
-  
-<div id="modeRow" style="display:flex;gap:6px">
-   <button class="btn" data-filter="mode" data-value="major">Major</button>
-   <button class="btn" data-filter="mode" data-value="minor">Minor</button>
-   <!-- NEW -->
-   <button class="btn" data-filter="mode" data-value="chromatic">Chromatic</button>
-   <button class="btn" data-filter="mode" data-value="pedal">Pedal Point</button>
-   <button class="btn" data-filter="mode" data-value="modulating">Modulating</button>
-   <button class="btn" data-filter="mode" data-value="mod-remote">Modulating (remote keys)</button>
- </div>
-
-</div>
+    <div class="group" data-role="category">
+      <div class="small">Category:</div>
+      <div id="categoryRow" style="display:flex;gap:6px">
+        <button class="btn" data-filter="category" data-value="common-chord">Common Chord</button>
+        <button class="btn" data-filter="category" data-value="ascending">Ascending RoO</button>
+        <button class="btn" data-filter="category" data-value="descending">Descending RoO</button>
+        <button class="btn" data-filter="category" data-value="chromatic">Chromatic</button>
+        <button class="btn" data-filter="category" data-value="pedal">Pedal Point</button>
+        <button class="btn" data-filter="category" data-value="modulating">Modulating</button>
+        <button class="btn" data-filter="category" data-value="mod-remote">Modulating (Remote Keys)</button>
+      </div>
+    </div>
 
     <div class="group" data-role="level">
       <div class="small">Lvl:</div>
@@ -583,8 +582,6 @@ const svgHost = document.getElementById('svg');
 const humPanel = document.getElementById('humPanel');
 const status = document.getElementById('status');
 
-const dirRow = document.getElementById('dirRow');
-const modeRow = document.getElementById('modeRow');
 const diffRow = document.getElementById('diffRow');
 const matchCount = document.getElementById('matchCount');
 const totalCount = document.getElementById('totalCount');
@@ -694,58 +691,36 @@ const octPlus = document.getElementById('octPlus');
 })();
 
 // -------------------- Filter state (internal) --------------------
-const selected = { dir: new Set(), mode: new Set(), diff: new Set() };
+// -------------------- Filter state (internal) --------------------
+const DEFAULT_KEY_MODES = new Set(['major', 'minor']);
+const DEFAULT_CATEGORIES = new Set(['ascending', 'descending']);
+const DEFAULT_DIFFS = new Set(['1', '2', '3', '4', '5', '6', '7']);
+
+const selected = {
+  keyMode: new Set(DEFAULT_KEY_MODES),
+  category: new Set(DEFAULT_CATEGORIES),
+  diff: new Set(DEFAULT_DIFFS)
+};
 
 // make sure catalog exists before any UI code calls currentMatches()
 let catalog = [];
 
-// --- DEFAULT SELECTED: Direction, Mode, Level buttons (visual only) ---
-// --- DEFAULT SELECTED: Direction, Mode, Level buttons (visual only) ---
-(function initDefaultFilterSelections(){
-  // 1) Direction: default ON for Ascending + Descending
-  document.querySelectorAll('#dirRow .btn').forEach(btn => {
-    btn.classList.add('selected');
-  });
-
-  // 2) Mode (category): default ON for Major/Minor; OFF for Chromatic/Pedal/Modulating
-  document.querySelectorAll('#modeRow .btn').forEach(btn => {
+function setButtonSelection(containerSelector, activeSet) {
+  document.querySelectorAll(containerSelector + ' .btn').forEach(btn => {
     const v = btn.dataset.value;
-    const on = (v === 'major' || v === 'minor');
-    if (on) btn.classList.add('selected');
-    else btn.classList.remove('selected');
+    if (!v) return;
+    btn.classList.toggle('selected', activeSet.has(v));
   });
+}
 
-  // 3) Level: default ON for 1–7
-  document.querySelectorAll('#diffRow .btn').forEach(btn => {
-    btn.classList.add('selected');
-  });
-
-  // 4) Initialize the internal selected sets to match those visuals
-  selected.dir.clear();
-  selected.mode.clear();
-  selected.diff.clear();
-
-  // Dir: add both
-  Array.from(document.querySelectorAll('#dirRow .btn')).forEach(b => {
-    const v = b.dataset.value;
-    if (v) selected.dir.add(v);
-  });
-
-  // Mode: ONLY add Major/Minor (Chromatic/Pedal/Modulating stay OFF)
-  Array.from(document.querySelectorAll('#modeRow .btn')).forEach(b => {
-    const v = b.dataset.value;
-    if (v === 'major' || v === 'minor') selected.mode.add(v);
-  });
-
-  // Diff: add all 1–7
-  Array.from(document.querySelectorAll('#diffRow .btn')).forEach(b => {
-    const v = b.dataset.value;
-    if (v) selected.diff.add(v);
-  });
-
-  // 5) Initial count
+function initDefaultFilterSelections() {
+  setButtonSelection('#keyModeRow', selected.keyMode);
+  setButtonSelection('#categoryRow', selected.category);
+  setButtonSelection('#diffRow', selected.diff);
   updateMatchCount();
-})();
+}
+
+initDefaultFilterSelections();
 
 // -------------------- Utils --------------------
 function setStatus(txt, isErr){
@@ -1530,21 +1505,31 @@ if (
   return outLines.join('\n');
 }
 
+function prettyCategoryName(mode) {
+  const m = String(mode || '').toLowerCase();
+  if (m === 'common-chord') return 'Common Chord';
+  if (m === 'ascending') return 'Ascending RoO';
+  if (m === 'descending') return 'Descending RoO';
+  if (m === 'chromatic') return 'Chromatic';
+  if (m === 'pedal') return 'Pedal Point';
+  if (m === 'modulating') return 'Modulating';
+  if (m === 'mod-remote') return 'Modulating (Remote Keys)';
+  if (m === 'major') return 'Major';
+  if (m === 'minor') return 'Minor';
+  return mode ? String(mode) : '';
+}
+
 // -------------------- Catalog / filters / UI --------------------
-function capitalize(s){ return String(s || '').replace(/^\w/, c => c.toUpperCase()); }
-function updatePillsFromCatalogEntry(entry){
-  function uc(s){ return String(s||'').replace(/^\w/, c => c.toUpperCase()); }
-  const dirWord = entry?.dir ? uc(entry.dir) : '';
-  const modeWord = entry?.mode ? uc(entry.mode) : '';
+function updatePillsFromCatalogEntry(entry) {
+  const categoryWord = entry?.mode ? prettyCategoryName(entry.mode) : '';
   const lvl = entry?.diff != null ? String(entry.diff) : '';
-  const leftParts = [dirWord, modeWord].filter(Boolean).join(' ').trim();
-  const core = 'Rule of the Octave';
-  let pieces = [];
-  if (leftParts) pieces.push(leftParts);
-  pieces.push(core);
+  const pieces = [];
+
+  if (categoryWord) pieces.push(categoryWord);
+  pieces.push('Rule of the Octave');
   if (lvl) pieces.push(lvl);
-  const finalText = pieces.join(' ');
-  titlePill.innerHTML = escapeHtml(finalText || 'No title');
+
+  titlePill.innerHTML = escapeHtml(pieces.join(' ') || 'No title');
 }
 function formatKeyName(tonic, mode){
   if (!tonic) return 'original';
@@ -1593,20 +1578,49 @@ async function fetchText(path){
   const t = await r.text();
   return { path: p, text: t };
 }
-function metaFromHeader(krn) {
+function inferKeyMode(path, text) {
+  const fname = String(path || '').toLowerCase().split('/').pop() || '';
+
+  // Filename wins for the common-chord set
+  if (/_common_min_/i.test(fname) || /cpe_common_min_/i.test(fname)) return 'minor';
+  if (/_common_maj_/i.test(fname) || /cpe_common_maj_/i.test(fname)) return 'major';
+
+  // Then trust the actual Humdrum key token
+  const m = String(text || '').match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m);
+  if (m) return (m[1] === m[1].toUpperCase()) ? 'major' : 'minor';
+
+  return 'major';
+}
+
+function metaFromHeader(krn, path = '') {
   const lines = krn.split(/\r?\n/).slice(0, 120);
-  let dir = null, category = null, title = null, diff = null;
-
-  // Detect true key-mode (major/minor) from the key token: *C: vs *a:
   let keyMode = null;
-  const keyMatch = krn.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m);
-  if (keyMatch) {
-    keyMode = (keyMatch[1] === keyMatch[1].toUpperCase()) ? 'major' : 'minor';
-  }
+  let category = null;
+  let title = null;
+  let diff = null;
 
-  for (const ln of lines) {
-    const s = (ln || '').trim();
-    if (!s || !s.startsWith('!!')) continue;
+  const p = String(path || '').toLowerCase();
+  const fname = p.split('/').pop() || '';
+
+  // Filename-first override for the common-chord set
+  if (/_common_min_/i.test(fname) || /cpe_common_min_/i.test(fname)) keyMode = 'minor';
+  if (/_common_maj_/i.test(fname) || /cpe_common_maj_/i.test(fname)) keyMode = 'major';
+  if (/common/.test(fname)) category = 'common-chord';
+
+  for (const rawLine of lines) {
+    const s = String(rawLine || '').trim();
+    if (!s) continue;
+
+    // Still accept the actual Humdrum key token
+    if (!keyMode) {
+      const keyTok = s.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/);
+      if (keyTok) {
+        keyMode = (keyTok[1] === keyTok[1].toUpperCase()) ? 'major' : 'minor';
+        continue;
+      }
+    }
+
+    if (!s.startsWith('!!')) continue;
 
     const titleMatch = s.match(/^!!\s*(?:Title|T)\s+(.*)$/i);
     if (titleMatch && titleMatch[1] && !title) {
@@ -1623,91 +1637,74 @@ function metaFromHeader(krn) {
     const dirLine = s.match(/^!!\s*Dir\b(.*)$/i);
     if (dirLine) {
       const rest = (dirLine[1] || '').trim();
-
-      // Direction
-      if (/ascending/i.test(rest)) dir = 'ascending';
-      if (/descending/i.test(rest)) dir = 'descending';
-
-      // Category detection
-     // Category detection
-if (/(remote\s*key\s*modulation|modulation\s*.*remote)/i.test(rest)) {
-  // NEW: explicit "Remote Key Modulation" → our new filter value
-  category = 'mod-remote';
-} else if (/modulating/i.test(rest)) {
-  category = 'modulating';
-} else if (/chromatic/i.test(rest)) {
-  category = 'chromatic';
-} else if (/pedal\s*point/i.test(rest)) {
-  category = 'pedal';
-} else {
-  // Legacy detection for major/minor in the Dir line
-  if (/major/i.test(rest)) category = 'major';
-  if (/minor/i.test(rest)) category = 'minor';
-}
-      continue;
+      if (/common\s*chord/i.test(rest)) category = 'common-chord';
+      else if (/ascending/i.test(rest)) category = 'ascending';
+      else if (/descending/i.test(rest)) category = 'descending';
+      else if (/(remote\s*key\s*modulation|modulation\s*.*remote)/i.test(rest)) category = 'mod-remote';
+      else if (/modulating/i.test(rest)) category = 'modulating';
+      else if (/chromatic/i.test(rest)) category = 'chromatic';
+      else if (/pedal\s*point/i.test(rest)) category = 'pedal';
     }
   }
 
-  // If no category was found in Dir line, fall back to key-mode
-  if (!category) category = keyMode || 'major';
-
-  return { dir, mode: category, keyMode, diff, title };
+  return { keyMode, mode: category, diff, title };
 }
-async function buildCatalog(paths, concurrency=4){
+
+async function buildCatalog(paths, concurrency = 4) {
   catalog = [];
   let i = 0;
   const results = [];
-  async function worker(){
-    while (i < paths.length){
+
+  async function worker() {
+    while (i < paths.length) {
       const idx = i++;
       const raw = paths[idx];
       if (!/\.(krn|hum|txt)$/i.test(raw)) continue;
+
       try {
         const { path, text } = await fetchText(raw);
-        const meta = metaFromHeader(text);
+      const meta = metaFromHeader(text, path);
+
 results.push({
   path,
-  dir: meta.dir,
-  mode: meta.mode,         // filter category: 'major'|'minor'|'chromatic'|'pedal'
-  keyMode: meta.keyMode,   // actual key-mode: 'major'|'minor' (from *C:/*a:)
+  mode: meta.mode,
+  keyMode: inferKeyMode(path, text),
   diff: meta.diff,
   title: meta.title,
   text
 });
-      } catch(e){ /* skip */ }
+      } catch (e) {
+        // skip bad file
+      }
     }
   }
-  await Promise.all(Array.from({length:concurrency}, worker));
-// Defensive: ensure no holes/undefined got in (shouldn’t happen, but safe)
-catalog = results.filter(Boolean);
+
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  catalog = results.filter(Boolean);
   if (totalCount) totalCount.textContent = String(catalog.length);
   updateMatchCount();
 }
 
 function pickRandom(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
 
-function matchesFilters(item){
-  // Defensive: skip non-objects
+function matchesFilters(item) {
   if (!item || typeof item !== 'object') return false;
 
-  // Dir: only enforce when the tune actually carries a direction (ascending/descending).
-  // Non-directional categories (modulating, pedal) will have no 'dir' — allow them through.
-  if (selected.dir.size){
-    if (item.dir) {
-      if (!selected.dir.has(item.dir)) return false;
-    }
-    // If item.dir is missing, do not filter out.
+  // Global key mode filter: major/minor from the key token
+  if (selected.keyMode.size) {
+    if (!item.keyMode || !selected.keyMode.has(item.keyMode)) return false;
   }
 
-  // Mode = category: 'major'|'minor'|'chromatic'|'pedal'|'modulating'
-  if (selected.mode.size){
-    if (!item.mode || !selected.mode.has(item.mode)) return false;
-  }
+  // Category filter:
+  // If nothing is selected, treat the default as Ascending RoO + Descending RoO.
+  const activeCategories = selected.category.size ? selected.category : DEFAULT_CATEGORIES;
+  if (!item.mode || !activeCategories.has(item.mode)) return false;
 
-  if (selected.diff.size){
+  if (selected.diff.size) {
     const d = String(item.diff ?? '');
     if (!selected.diff.has(d)) return false;
   }
+
   return true;
 }
 
@@ -2339,6 +2336,7 @@ function updateFigPlaceLabelVisuals() {
 function toggleFilterValue(filterName, value, btnEl) {
   const set = selected[filterName];
   if (!set) return;
+
   if (set.has(value)) {
     set.delete(value);
     btnEl.classList.remove('selected');
@@ -2346,24 +2344,27 @@ function toggleFilterValue(filterName, value, btnEl) {
     set.add(value);
     btnEl.classList.add('selected');
   }
+
   updateMatchCount();
 }
 
-// Attach listeners to Dir / Mode / Diff buttons
-Array.from(document.querySelectorAll('#dirRow .btn')).forEach(btn => {
+// Attach listeners to Key Mode / Category / Diff buttons
+Array.from(document.querySelectorAll('#keyModeRow .btn')).forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.value;
     if (!v) return;
-    toggleFilterValue('dir', v, btn);
+    toggleFilterValue('keyMode', v, btn);
   });
 });
-Array.from(document.querySelectorAll('#modeRow .btn')).forEach(btn => {
+
+Array.from(document.querySelectorAll('#categoryRow .btn')).forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.value;
     if (!v) return;
-    toggleFilterValue('mode', v, btn);
+    toggleFilterValue('category', v, btn);
   });
 });
+
 Array.from(document.querySelectorAll('#diffRow .btn')).forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.value;
@@ -2375,10 +2376,14 @@ Array.from(document.querySelectorAll('#diffRow .btn')).forEach(btn => {
 // Clear filters button: clear internal sets and visual selected classes
 if (clearBtn) {
   clearBtn.addEventListener('click', () => {
-    selected.dir.clear();
-    selected.mode.clear();
-    selected.diff.clear();
-    document.querySelectorAll('#dirRow .btn, #modeRow .btn, #diffRow .btn').forEach(b => b.classList.remove('selected'));
+    selected.keyMode = new Set(DEFAULT_KEY_MODES);
+    selected.category = new Set(DEFAULT_CATEGORIES);
+    selected.diff = new Set(DEFAULT_DIFFS);
+
+    setButtonSelection('#keyModeRow', selected.keyMode);
+    setButtonSelection('#categoryRow', selected.category);
+    setButtonSelection('#diffRow', selected.diff);
+
     updateMatchCount();
   });
 }
@@ -2556,47 +2561,20 @@ function renderScoreboard() {
 
 
 // Derive row label from the chosen entry (supports Ascending/Descending Chromatic)
+// Derive row label from the chosen entry (supports Ascending/Descending Chromatic, Common Chord)
+// Derive row label from the chosen entry
 function rowLabelFromEntry(entry) {
-  // entry.dir: 'ascending' | 'descending' | undefined
-  // entry.mode (category): 'major'|'minor'|'chromatic'|'pedal'|'modulating'
-  // entry.diff: Number from !! Number
   const category = (entry?.mode || '').toLowerCase();
-  const dir = (entry?.dir || '').toLowerCase();
   const num = (entry?.diff != null) ? String(entry.diff) : '';
+  const label = prettyCategoryName(category);
 
-  const cap = (s) => String(s || '').replace(/^\w/, c => c.toUpperCase());
-
-  // 1) Ascending/Descending Chromatic -> "Ascending Chromatic <Num>"
-  if ((dir === 'ascending' || dir === 'descending') && category === 'chromatic') {
-    const parts = [cap(dir), 'Chromatic', num].filter(Boolean);
-    return parts.join(' ');
+  if (label) {
+    return [label, num].filter(Boolean).join(' ');
   }
 
-  // 2) Non-directional categories (Modulating, Pedal) -> "<Category> <Num>"
-  // 2) Non-directional categories (Modulating, Modulating (remote keys), Chromatic, Pedal)
-if (!dir && (category === 'modulating' || category === 'mod-remote' || category === 'chromatic' || category === 'pedal')) {
-  let catLabel;
-  if (category === 'pedal') {
-    catLabel = 'Pedal Point';
-  } else if (category === 'mod-remote') {
-    catLabel = 'Modulating (remote keys)';
-  } else {
-    catLabel = cap(category);
-  }
-  const parts = [catLabel, num].filter(Boolean);
-  return parts.join(' ');
-}
-
-
-  // 3) Normal directional major/minor (or if category missing) -> "Ascending <Num>"
-  if (dir === 'ascending' || dir === 'descending') {
-    const parts = [cap(dir), num].filter(Boolean);
-    return parts.join(' ');
-  }
-
-  // 4) Fallback
   return num || '(untitled)';
 }
+
 
 // Public hook: call this right after a draw is finalized
 function updateScoreboardForDraw(entry, tonic, trueMode) {
@@ -2669,7 +2647,7 @@ randomBtn.addEventListener('click', async () => {
   // Pick from filtered catalog, or fall back to sample
   const pick = catalog.length
     ? pickRandom(currentMatches())
-    : { path:'sample', text: sample, dir:'descending', mode:'major', keyMode:'major', diff:1, title:'Sample' };
+    : { path:'sample', text: sample, mode:'descending', keyMode:'minor', diff:1, title:'Sample' };
 
   currentEntry = pick;
 
@@ -2677,12 +2655,22 @@ randomBtn.addEventListener('click', async () => {
   const mCategory = pick.mode || 'major';
 
   // True key-mode (major/minor) from key token for tonic/key-range logic
-  const mForTonics =
-    pick.keyMode ||
-    ((pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1] ===
-      pick.text.match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m)?.[1]?.toUpperCase())
-      ? 'major'
-      : 'minor') || 'major';
+  const inferKeyMode = (pick) => {
+  const path = String(pick?.path || '').toLowerCase();
+  const fname = path.split('/').pop() || '';
+
+  if (/_common_min_/i.test(fname) || /cpe_common_min_/i.test(fname)) return 'minor';
+  if (/_common_maj_/i.test(fname) || /cpe_common_maj_/i.test(fname)) return 'major';
+
+  if (pick?.keyMode === 'major' || pick?.keyMode === 'minor') return pick.keyMode;
+
+  const m = String(pick?.text || '').match(/^\*([A-Ga-g])([#\u266f-]?)\s*:/m);
+  if (m) return (m[1] === m[1].toUpperCase()) ? 'major' : 'minor';
+
+  return 'major';
+};
+
+const mForTonics = inferKeyMode(pick);
 
   // Use effective allowed tonics (Include-grid and Key-Range) based on true key-mode
   const allowedTonics = getEffectiveAllowedTonicsForMode(mForTonics);
@@ -2775,7 +2763,7 @@ refreshKeyButtonsUI();
 updateMatchCount();
 
 if (!currentKrn) {
-  currentEntry = { path:'sample', text: sample, dir:'descending', mode:'major', diff:1, title:'Sample' };
+  currentEntry = { path:'sample', text: sample, mode:'descending', keyMode:'minor', diff:1, title:'Sample' };
   const prepared = suppressThirdFourthSpinesAfterKey(sample);
   humPanel.textContent = '##original\n' + prepared + '\n\n##transposed to [none]\n';
   renderWithVerovio(sample, '');
@@ -2786,4 +2774,3 @@ if (!currentKrn) {
 </script>
 </body>
 </html>
-
