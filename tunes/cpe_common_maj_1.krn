@@ -1,0 +1,21 @@
+**kern	**fb	**text	**text
+!!		actual acc.	force diatonic accidental
+!! Dir	Common Chord
+!! Title	Common Chord
+!! Number	1
+*clefF4	*	*	*
+*k[]	*k[]	*k[]	*k[]
+*C:	*C:	*C:	*C:
+=1	=1	=1	=1
+4c	3	.	.
+=|	=|	=|	=|
+4F	8	.	.
+4G	5	.	.
+4c	3	.	.
+4A	3	.	.
+=|	=|	=|	=|
+4D	8	.	.
+4E	5 #	.	.
+2AA	3	.	.
+=||	=|	=|	=|
+*-	*-	*-	*-
