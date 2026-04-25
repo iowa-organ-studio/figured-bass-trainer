@@ -215,6 +215,15 @@ header {
   overflow: hidden;
   clip: rect(1px, 1px, 1px, 1px);
 }
+
+/* ---------------------------------------------------------- */
+/* Hide UI elements completely (NO layout space, JS-safe)     */
+/* Use this instead of visibility:hidden                      */
+.hidden-layout {
+  display: none !important;
+}
+/* ---------------------------------------------------------- */
+
 /* ======= Row 3: Key Range + Scale + Spacing (no outer big card) ======= */
 .key-grid{
   display:flex;flex-wrap:nowrap;gap:6px;
@@ -357,7 +366,71 @@ input[type="radio"] { accent-color: var(--gold); }
   width: auto;
   white-space: nowrap;
 }
-  
+
+/* ---------------------------------------------------------- */
+/* Double Length card — shrink-wrap to label + Off/On only   */
+/* ---------------------------------------------------------- */
+.group[data-role="double-length"] {
+  display: inline-flex;     /* prevents block stretching */
+  flex: 0 0 auto;           /* do NOT grow or shrink */
+  width: max-content;       /* exact width of contents */
+  white-space: nowrap;      /* keep label + radios inline */
+  align-items: center;
+  padding-top: 8px;
+  padding-bottom: 8px;      /* match Scale/Spacing height */
+}
+
+/* ===== Row 3 layout FIX ===== */
+
+/* Keep everything on one row */
+#row3 {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.group[data-role="key-range"] {
+  flex: 0 1 auto;   /* allow shrinking but NOT growing */
+  min-width: 0;
+}
+
+/* Keep Scale + Spacing compact */
+.group[data-role="scale"],
+.group[data-role="spacing"] {
+  flex: 0 0 auto;
+}
+
+/* Double Length = small, fixed-size card */
+.group[data-role="double-length"] {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Force Row 3 to behave like a single toolbar */
+#row3 {
+  display: flex;
+  align-items: center;
+}
+
+
+
+/* Key Range should NOT expand */
+.group[data-role="key-range"] {
+  flex: 0 0 auto;
+}
+
+/* Make Double Length match height of Scale/Spacing */
+.group[data-role="double-length"] {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  align-items: center;
+}
+
+#row3 .group[data-role="double-length"] {
+  flex: 0 0 auto;
+  width: auto;
+}
+
 </style>
 </head>
 <body>
@@ -414,6 +487,27 @@ input[type="radio"] { accent-color: var(--gold); }
       </div>
     </div>
 
+  <!-- Double Length -->
+<div class="group" data-role="double-length">
+  <div class="small">Double Length</div>
+
+  <!-- Hidden legacy controls (kept for JS, no layout impact) -->
+  <button class="small-pill hidden-layout">reset</button>
+  <button class="btn hidden-layout">−</button>
+  <button class="btn hidden-layout">+</button>
+
+  <div class="small-pill hidden-layout">0.00</div>
+
+  <div class="radio-inline">
+    <label id="labelDLOff">
+      <input type="radio" name="doubleLength" value="off" checked> Off
+    </label>
+    <label id="labelDLOn">
+      <input type="radio" name="doubleLength" value="on"> On
+    </label>
+  </div>
+</div>
+
     <!-- Scale -->
     <div class="group" data-role="scale">
       <div class="small">Scale</div>
@@ -436,6 +530,8 @@ input[type="radio"] { accent-color: var(--gold); }
       <div class="slider" aria-hidden="true"><input id="spacingSlider" type="range" min="10" max="120" value="32"></div>
     </div>
   </div>
+
+
 
   <!-- ===== (Hidden) Transpose/Octave UI kept for JS ======= -->
   <div class="controls-row" style="margin-top:8px">
@@ -615,6 +711,8 @@ const downloadTraceBtn = document.getElementById('downloadTrace');
 const modeTagline = document.getElementById('modeTagline');
 const historicalStatus = document.getElementById('historicalStatus');
 
+// Double length
+let DOUBLE_LENGTH = false;
 
 // Accidentals (Historic/Modern)
 const accRadios = Array.from(document.querySelectorAll('input[name="accMode"]'));
@@ -781,6 +879,38 @@ function normalizeTonicForHumdrum(s) {
     .replace(/b/g, '-');
 
   return letter + acc;
+}
+
+// double length button
+function applyDoubleLengthToSpine1(krnText) {
+  if (!DOUBLE_LENGTH) return krnText;
+
+  const lines = krnText.split(/\r?\n/);
+
+  return lines.map(line => {
+    if (!line.includes('\t')) return line;
+
+    const fields = line.split('\t');
+    const tok = (fields[0] || '').trim();
+
+    // Only transform actual note/rest tokens (not *, =, .)
+    if (!tok || tok === '.' || tok.startsWith('*') || tok.startsWith('=')) {
+      return line;
+    }
+
+    // Match duration at start (e.g., 4F, 8r, 16cc#)
+    const m = tok.match(/^(\d+)(.*)$/);
+    if (!m) return line;
+
+    const dur = parseInt(m[1], 10);
+    const rest = m[2];
+
+    // Double length = halve number (4 → 2, 2 → 1, etc.)
+    const newDur = Math.max(1, Math.floor(dur / 2));
+
+    fields[0] = String(newDur) + rest;
+    return fields.join('\t');
+  }).join('\n');
 }
 
 // Parse tonic string "A", "Ab", "C#", returns {letter, acc, mode}
@@ -2125,7 +2255,10 @@ function runPipelineForEntry(entry, tonic, m){
   const withResolvedQ = resolveQInSpine2(withCourtesy, tonic, m);
 
   // Suppress spines 3 & 4 (text to Verovio)
-  const suppressed = suppressThirdFourthSpinesAfterKey(withResolvedQ);
+  let suppressed = suppressThirdFourthSpinesAfterKey(withResolvedQ);
+
+// APPLY DOUBLE LENGTH HERE
+suppressed = applyDoubleLengthToSpine1(suppressed);
   const krnSentToVerovio = suppressed;
 
   // Figure-aware transform using spelled interval + chromatic-bass support
@@ -2391,6 +2524,35 @@ function updateFigPlaceLabelVisuals() {
   updateFigPlaceLabelVisuals();
 })();
 
+// double length
+function updateDoubleLengthLabels() {
+  const on = document.querySelector('input[name="doubleLength"][value="on"]');
+  const off = document.querySelector('input[name="doubleLength"][value="off"]');
+  const labOn = document.getElementById('labelDLOn');
+  const labOff = document.getElementById('labelDLOff');
+
+  if (on && on.checked) {
+    labOn.classList.add('selected');
+    labOff.classList.remove('selected');
+  } else {
+    labOff.classList.add('selected');
+    labOn.classList.remove('selected');
+  }
+}
+
+document.querySelectorAll('input[name="doubleLength"]').forEach(r => {
+  r.addEventListener('change', () => {
+    DOUBLE_LENGTH = (r.value === 'on');
+    updateDoubleLengthLabels();
+
+    if (currentEntry && lastTargetTonic && lastTargetMode) {
+      runPipelineForEntry(currentEntry, lastTargetTonic, lastTargetMode);
+    }
+  });
+});
+
+// initialize
+updateDoubleLengthLabels();
 
 // -------------------- Filter button wiring (FIX) --------------------
 // Utility to toggle a value in a Set and update UI/counts
