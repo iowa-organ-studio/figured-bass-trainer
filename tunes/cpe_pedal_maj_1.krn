@@ -1,0 +1,17 @@
+**kern	**fb	**text	**text
+!!		actual acc.	force diatonic accidental
+!! Dir	Pedal Point
+!! Title	Rule of the Octave
+!! Number	1
+*clefF4	*	*	*
+*k[]	*k[]	*k[]	*k[]
+*a:	*a:	*a:	*a:
+=1	=1	=1	=1
+0C	5 3	.	.
+.	7 4 2	.	.
+.	7- 3	7- 3	.
+.	6 4	.	.
+.	7 6- 4 2	.	.
+.	8 5 3	.	.
+=||	=|	=|	=|
+*-	*-	*-	*-
