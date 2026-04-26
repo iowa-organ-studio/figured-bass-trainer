@@ -1,0 +1,19 @@
+**kern	**fb	**text	**text
+!!		actual acc.	force diatonic accidental
+!! Dir	Remote Key Modulation
+!! Title	Rule of the Octave
+!! Number	2
+*clefF4	*	*	*
+*k[]	*k[]	*k[]	*k[]
+*C:	*C:	*C:	*C:
+=1	=1	=1	=1
+4C	5	.	.
+.	6	.	.
+4GG#	6 5	.	.
+4GG	4/| 2/	4# 2#	.
+4FF##	7- 5- #	7n 5# #	.
+4GG#	6 4#	.	.
+4GG#	5# #	.	.
+2C#	.	.	.
+=||	=|	=|	=|
+*-	*-	*-	*-
