@@ -1693,17 +1693,23 @@ function updatePillsFromCatalogEntry(entry) {
 
   let title = '';
 
+  // Categories that SHOULD NOT show "Rule of the Octave"
+  const noRoO = new Set(['pedal', 'modulating', 'mod-remote']);
+
   if (mode === 'ascending' || mode === 'descending' || mode === 'asc-chromatic' || mode === 'desc-chromatic') {
     const dir = categoryDisplayName(mode);
-    const isChrom = mode === 'asc-chromatic' || mode === 'desc-chromatic';
-    title = isChrom
-      ? `${dir} Rule of the Octave ${lvl}`
-      : `${dir} Rule of the Octave ${lvl}`;
+    title = `${dir} Rule of the Octave ${lvl}`;
   } else if (mode === 'common-chord') {
     title = `Common Chord (${keyMode}) ${lvl}`;
   } else {
     const categoryWord = categoryDisplayName(mode);
-    title = `${categoryWord ? categoryWord + ' ' : ''}Rule of the Octave ${lvl}`;
+
+    if (noRoO.has(mode)) {
+      // 🔥 NO "Rule of the Octave"
+      title = `${categoryWord} ${lvl}`;
+    } else {
+      title = `${categoryWord ? categoryWord + ' ' : ''}Rule of the Octave ${lvl}`;
+    }
   }
 
   titlePill.innerHTML = escapeHtml(title.trim() || 'No title');
@@ -2793,6 +2799,8 @@ function rowLabelFromEntry(entry) {
   const category = (entry?.mode || '').toLowerCase();
   const num = (entry?.diff != null) ? String(entry.diff) : '';
 
+  const noRoO = new Set(['pedal', 'modulating', 'mod-remote']);
+
   if (category === 'common-chord') {
     const keyMode = entry?.keyMode ? ` (${entry.keyMode})` : '';
     return `Common Chord${keyMode}${num ? ' ' + num : ''}`;
@@ -2807,6 +2815,12 @@ function rowLabelFromEntry(entry) {
   }
 
   const label = categoryDisplayName(category);
+
+  if (noRoO.has(category)) {
+    // 🔥 NO "Rule of the Octave"
+    return `${label}${num ? ' ' + num : ''}`;
+  }
+
   if (label) {
     return [label, 'Rule of the Octave', num].filter(Boolean).join(' ');
   }
