@@ -2691,7 +2691,9 @@ function renderScoreboard() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const labels = Array.from(scoreState.keys()).sort((a, b) => a.localeCompare(b));
+  const labels = Array.from(scoreState.keys()).sort((a, b) =>
+  a.localeCompare(b, undefined, { numeric: true })
+);
 
   // Precompute column totals and row totals
   const colTotals = new Map(SCORE_COLS_ASCII.map(k => [k, 0]));
