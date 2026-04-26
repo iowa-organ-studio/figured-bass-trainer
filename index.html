@@ -576,19 +576,7 @@ input[type="radio"] { accent-color: var(--gold); }
       </div>
     </div>
 
-    <div class="group" data-role="level">
-      <div class="small">Lvl:</div>
-      <div id="diffRow" style="display:flex;gap:6px">
-        <button class="btn" data-filter="diff" data-value="1">1</button>
-        <button class="btn" data-filter="diff" data-value="2">2</button>
-        <button class="btn" data-filter="diff" data-value="3">3</button>
-        <button class="btn" data-filter="diff" data-value="4">4</button>
-        <button class="btn" data-filter="diff" data-value="5">5</button>
-        <button class="btn" data-filter="diff" data-value="6">6</button>
-        <button class="btn" data-filter="diff" data-value="7">7</button>
-      </div>
-    </div>
-
+   
     <div class="group" data-role="accidentals">
       <div class="small" style="min-width:88px">Accidentals:</div>
       <div class="radio-inline" id="accRadioInline">
@@ -814,12 +802,9 @@ function chooseTargetKeyMode() {
 // -------------------- Filter state (internal) --------------------
 const DEFAULT_KEY_MODES = new Set(['major', 'minor']);
 const DEFAULT_CATEGORIES = new Set(['ascending', 'descending']);
-const DEFAULT_DIFFS = new Set(['1', '2', '3', '4', '5', '6', '7']);
-
 const selected = {
   keyMode: new Set(DEFAULT_KEY_MODES),
-  category: new Set(DEFAULT_CATEGORIES),
-  diff: new Set(DEFAULT_DIFFS)
+  category: new Set(DEFAULT_CATEGORIES)
 };
 
 // make sure catalog exists before any UI code calls currentMatches()
@@ -1897,11 +1882,7 @@ function matchesFilters(item) {
   const activeCategories = selected.category.size ? selected.category : DEFAULT_CATEGORIES;
   if (!item.mode || !activeCategories.has(item.mode)) return false;
 
-  if (selected.diff.size) {
-    const d = String(item.diff ?? '');
-    if (!selected.diff.has(d)) return false;
-  }
-
+ 
   return true;
 }
 
@@ -2594,24 +2575,18 @@ Array.from(document.querySelectorAll('#categoryRow .btn')).forEach(btn => {
   });
 });
 
-Array.from(document.querySelectorAll('#diffRow .btn')).forEach(btn => {
-  btn.addEventListener('click', () => {
-    const v = btn.dataset.value;
-    if (!v) return;
-    toggleFilterValue('diff', v, btn);
-  });
-});
+
 
 // Clear filters button: clear internal sets and visual selected classes
 if (clearBtn) {
   clearBtn.addEventListener('click', () => {
     selected.keyMode = new Set(DEFAULT_KEY_MODES);
     selected.category = new Set(DEFAULT_CATEGORIES);
-    selected.diff = new Set(DEFAULT_DIFFS);
+    
 
     setButtonSelection('#keyModeRow', selected.keyMode);
     setButtonSelection('#categoryRow', selected.category);
-    setButtonSelection('#diffRow', selected.diff);
+    
 
     updateMatchCount();
   });
