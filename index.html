@@ -116,6 +116,17 @@ header {
   padding:4px 8px;border-radius:999px;border:1px solid var(--grey);
   background:var(--grey);color:#222;cursor:pointer;font-size:.82rem;line-height:1
 }
+
+/* Wider finger targets for Scale / Spacing +/- buttons.
+   Keep the existing height unchanged. */
+#scaleMinus,
+#scalePlus,
+#spacingMinus,
+#spacingPlus {
+  width: 60px;
+  border-radius: 6px;
+}
+
 /* Selected / toggled states across the app (chips, radios, etc.) */
 .btn.selected,
 .level-btn.toggled,
@@ -511,10 +522,10 @@ input[type="radio"] { accent-color: var(--gold); }
 
   <div class="radio-inline">
     <label id="labelDLOff">
-      <input type="radio" name="doubleLength" value="off" checked> Off
+      <input type="radio" name="doubleLength" value="off"> Off
     </label>
     <label id="labelDLOn">
-      <input type="radio" name="doubleLength" value="on"> On
+      <input type="radio" name="doubleLength" value="on" checked> On
     </label>
   </div>
 </div>
@@ -711,7 +722,7 @@ const modeTagline = document.getElementById('modeTagline');
 const historicalStatus = document.getElementById('historicalStatus');
 
 // Double length
-let DOUBLE_LENGTH = false;
+let DOUBLE_LENGTH = true;
 
 // Accidentals (Historic/Modern)
 const accRadios = Array.from(document.querySelectorAll('input[name="accMode"]'));
