@@ -122,3 +122,12 @@ footer img{width:min(100%,660px)}
 .control input{accent-color:#244C9A}
 .difficulty-card svg{max-width:320px}
 @media(max-width:760px){.difficulty-card svg{max-width:250px}}
+
+/* Composer practice-history navigation */
+.composer-history-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.composer-history-tabs button{border:1px solid #ccc;background:#f6f6f6;color:#222;border-radius:9px;padding:9px 15px;font:inherit;font-weight:700;cursor:pointer}
+.composer-history-tabs button.active{background:var(--history-accent,#333);color:#fff;border-color:var(--history-accent,#333)}
+.composer-history-tabs button:focus-visible{outline:2px solid #222;outline-offset:2px}
+.top-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+
+body{--history-accent:#294F9A;}
